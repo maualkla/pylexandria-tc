@@ -42,28 +42,42 @@ def session():
             return "GET"
         ## Method: POST /session (New Login)
         elif request.method == 'POST': 
+            ## Validate if the required structure is present.
             _requested_params = True if request.json['requestString'] and request.json['client'] else False
             if _requested_params:
-                _session_string = b64Decode(request.json['requestString'])
-                _session_params = _session_string.split("_")
+                ## Get the params from the verified structure (decoding the requestString)
+                _decoded_str = b64Decode(request.json['requestString'])
+                ## spliting the string into the un [0] and pass [1]
+                _sess_params = _decoded_str.split("_")
                 _client = request.json['client']
-                if _session_params[0] and _session_params[1] and _client['ip'] and _client['browser']:
-                    _user = users_ref.document(_session_params[0]).get().to_dict()
-                    ## if user not found, user will = None and will send 404, else it will continue
+                ## Validating the values are there and are valid to proceed.
+                if _sess_params[0] and _sess_params[1] and _client['ip'] and _client['browser']:
+                    ## Get user reference and seach for the user on the request.
+                    _user = users_ref.document(_sess_params[0]).get().to_dict()
+                    ## if user not found, user will = None and will send 400 for security reasons, else it will continue
                     if _user != None:
-                        _requ = encrypt(_session_params[1]).decode('utf-8')
+                        ## The password gets encrypted and decoded. Then we delete the internal value of the password for security reasons
+                        _requ = encrypt(_sess_params[1]).decode('utf-8')
+                        _sess_params[1] = ""
+                        ## Get the firebase_response_user object. It also is decoded.
                         _fire = _user['pass'].decode('utf-8')
+                        ## Generate the ID for this session.
                         _idg = idGenerator(15)
+                        ## Validate if the pass is the same in the request as it is in the firebase_object
                         if _requ == _fire:
-                            _token = getToken(_session_params[0])
+                            ## Get the user token. In case exist it will retrieve the tokenId. Else return False.
+                            _token = getToken(_sess_params[0])
+                            ## Validate if valid token. is present. If not, generates a new token for the user.
                             if _token == False:  
-                                _token = tokenGenerator(_session_params[0], False)
+                                ## calls tokenGenerator sending user name and False. To generate a temporal token.
+                                _token = tokenGenerator(_sess_params[0], False)
+                            ## Generate the json object required to create the session object.
                             _session_json = {
                                 "clientIp" : _client['ip'],
                                 "clientVersion": _client['browser'],
                                 "id": _idg,
                                 "tokenId": _token,
-                                "userId": _session_params[0]
+                                "userId": _sess_params[0]
                             }
                             try:
                                 ## Call to create the workspace.
@@ -72,7 +86,7 @@ def session():
                                 ## In case of an error updating the user, retrieve a error message.
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Session object failed to be created."}), 500
-                            return jsonify({"_session_id": _idg, "trxId": trxGenerator(currentDate(), _session_params[0])}), 200
+                            return jsonify({"_session_id": _idg, "trxId": trxGenerator(currentDate(), _sess_params[0])}), 200
                         else:
                             return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
                     else:
@@ -81,7 +95,6 @@ def session():
                     return jsonify({"status": "Error", "code": 403, "reason": "Missing Requested Parameters"}), 403
             else:
                 return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Data Structure"}), 422
-            return "POST"
         ## Method: DELETE /session
         elif request.method == 'DELETE': 
             return "DELETE"
@@ -504,30 +517,14 @@ def encode():
         return {"status": "An error Occurred", "error": str(e)}
 
 ########################################
-### Helpers ############################
+### Private Services  ##################
 ########################################
 
-## return String (lenght)
-def randomString(_length):
-    try:
-        print(" >> randomString() helper.")
-        import random, string
-        output_str = ''.join(random.choice(string.ascii_letters) for i in range(_length))
-        return output_str
-    except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+## Token Services
 
-## return userId
-def idGenerator(_length):
-    try:
-        print(" >> idGenerator() helper.")
-        userId = currentDate()
-        userId = randomString(2) + userId + randomString(_length)
-        return userId
-    except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
-
-## token generator
+## token generator (POST)
+## _user: User Email for the Token.
+## _ilimited: If true will set a timedelta of 180 days, else will be only for 72 hours.
 def tokenGenerator(_user, _ilimited):
     try:
         print(" >> tokenGenerator() helper.")
@@ -591,7 +588,6 @@ def deleteUserTokens(_un):
         _tokens_count += 1
     return _tokens_count
 
-
 ## Get UserToken
 def getToken(_un):
     try:
@@ -607,7 +603,10 @@ def getToken(_un):
             if not _valid or _tokens_count > 1:
                 deleteToken(_tok.id)
                 return False
-        return _tok.id
+        if _tokens_count > 0:
+            return _tok.id
+        else:
+            return False
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
 
@@ -619,6 +618,30 @@ def deleteToken(_id):
             return True
         else: 
             return False
+    except Exception as e:
+        return {"status": "An error Occurred", "error": str(e)}
+
+########################################
+### Helpers ############################
+########################################
+
+## return String (lenght)
+def randomString(_length):
+    try:
+        print(" >> randomString() helper.")
+        import random, string
+        output_str = ''.join(random.choice(string.ascii_letters) for i in range(_length))
+        return output_str
+    except Exception as e:
+        return {"status": "An error Occurred", "error": str(e)}
+
+## return userId
+def idGenerator(_length):
+    try:
+        print(" >> idGenerator() helper.")
+        userId = currentDate()
+        userId = randomString(2) + userId + randomString(_length)
+        return userId
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
 
