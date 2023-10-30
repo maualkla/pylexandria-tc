@@ -31,7 +31,26 @@ tokens_ref = db.collection('tokens')
 trx_ref = db.collection('transactions')
 wsp_ref = db.collection('workspaces')
 
-## Login service
+## Session Service (new login)
+@app.route('/session', methods=['GET', 'POST', 'DELETE'])
+def session():
+    try:
+        ## Method: GET /session
+        if request.method == 'GET':
+            ## code for post
+            return "1"
+        ## Method: POST /session
+        elif request.method == 'POST': 
+            return "2"
+        ## Method: DELETE /session
+        elif request.method == 'DELETE': 
+            return "3"
+        else:
+            return jsonify({"status": "Error", "code": 405, "reason": "Method Not Allowed"}), 405
+    except Exception as e: 
+        return {"status":"Error", "code": "500", "reason": str(e)}
+
+## Login service (deprecated)
 @app.route("/login", methods=['GET'])
 def login():
     try:
