@@ -579,6 +579,7 @@ def deleteUserTokens(_un):
     print(" >> deleteUserTokens() helper.")
     ## search in firestore from tokens of currrent user
     _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _un))
+    ## Set the tokens count to know how many tokens were deleted.
     _tokens_count = 0
     ## for each token returned
     for _tok in _tokens.stream():
@@ -594,18 +595,25 @@ def getToken(_un):
         print(" >> getToken() helper.")
         ## search in firestore from tokens of currrent user
         _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _un))
+        ## Set the tokens count to know how many tokens were processed.
         _tokens_count = 0
+        ## Iterate the posible tokens for the user.
         for _tok in _tokens.stream():
-            ## if inside, _exists = true and delete current token
+            ## Save the current token object in _token
             _token = _tok
+            ## sums 1 to the tokens count
             _tokens_count += 1
+            ## Validate if the token is valid
             _valid = tokenValidator(_un, _token.id)
+            ## In case _valid == False or tokens_count > 1 it will delete the token and return false indicating error. 
             if not _valid or _tokens_count > 1:
                 deleteToken(_tok.id)
                 return False
+        ## If tokens count == 1 we return the id value of the token.
         if _tokens_count > 0:
             return _tok.id
         else:
+            ## Else we return false indicating error.
             return False
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
