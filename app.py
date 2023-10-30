@@ -8,10 +8,11 @@
 ## Description: API for the services required by the adminde-tc proyect.
 
 ## Imports
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request
 from firebase_admin import credentials, firestore, initialize_app
+from google.cloud.firestore_v1.base_query import FieldFilter
 from config import Config
-import os, rsa, bcrypt, base64, json
+import rsa, bcrypt, base64, json
 
 ## Initiate Public and private key
 publicKey, privateKey = rsa.newkeys(512)
@@ -30,25 +31,64 @@ users_ref = db.collection('users')
 tokens_ref = db.collection('tokens')
 trx_ref = db.collection('transactions')
 wsp_ref = db.collection('workspaces')
+sess_ref = db.collection('sessions')
 
-## Session Service (new login)
+## Session Service
 @app.route('/session', methods=['GET', 'POST', 'DELETE'])
 def session():
     try:
         ## Method: GET /session
         if request.method == 'GET':
-            ## code for post
-            return "1"
-        ## Method: POST /session
+            return "GET"
+        ## Method: POST /session (New Login)
         elif request.method == 'POST': 
-            return "2"
+            _requested_params = True if request.json['requestString'] and request.json['client'] else False
+            if _requested_params:
+                _session_string = b64Decode(request.json['requestString'])
+                _session_params = _session_string.split("_")
+                _client = request.json['client']
+                if _session_params[0] and _session_params[1] and _client['ip'] and _client['browser']:
+                    _user = users_ref.document(_session_params[0]).get().to_dict()
+                    ## if user not found, user will = None and will send 404, else it will continue
+                    if _user != None:
+                        _requ = encrypt(_session_params[1]).decode('utf-8')
+                        _fire = _user['pass'].decode('utf-8')
+                        _idg = idGenerator(15)
+                        if _requ == _fire:
+                            _token = getToken(_session_params[0])
+                            if _token == False:  
+                                _token = tokenGenerator(_session_params[0], False)
+                            _session_json = {
+                                "clientIp" : _client['ip'],
+                                "clientVersion": _client['browser'],
+                                "id": _idg,
+                                "tokenId": _token,
+                                "userId": _session_params[0]
+                            }
+                            try:
+                                ## Call to create the workspace.
+                                sess_ref.document(_idg).set(_session_json)
+                            except Exception as e:
+                                ## In case of an error updating the user, retrieve a error message.
+                                print('(!) >> Handled external service exception: ' + str(e) )
+                                return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Session object failed to be created."}), 500
+                            return jsonify({"_session_id": _idg, "trxId": trxGenerator(currentDate(), _session_params[0])}), 200
+                        else:
+                            return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
+                    else:
+                        return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
+                else:
+                    return jsonify({"status": "Error", "code": 403, "reason": "Missing Requested Parameters"}), 403
+            else:
+                return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Data Structure"}), 422
+            return "POST"
         ## Method: DELETE /session
         elif request.method == 'DELETE': 
-            return "3"
+            return "DELETE"
         else:
             return jsonify({"status": "Error", "code": 405, "reason": "Method Not Allowed"}), 405
     except Exception as e: 
-        return {"status":"Error", "code": "500", "reason": str(e)}
+        return {"status":"Error", "code": 500, "reason": str(e)}
 
 ## Login service (deprecated)
 @app.route("/login", methods=['GET'])
@@ -79,7 +119,7 @@ def login():
                     ## generates token with user, send False flag, to get a token valid for 72 hours, True for 180 days
                     _token = tokenGenerator(_username, False)
                     ## return _token generated before, a transaction id and a 200 code.
-                    return jsonify({"expire": _token['expire'], "id": _token['id'], "username": _token['username'], "trxId": trxGenerator(currentDate(), _username)}), 200
+                    return jsonify({"expire": "", "id": _token, "username": "", "trxId": trxGenerator(currentDate(), _username), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
                 else:
                     return jsonify({"status": "Error", "code": "401", "reason": "Not Authorized, review user or password"}), 401
             else:
@@ -478,11 +518,11 @@ def randomString(_length):
         return {"status": "An error Occurred", "error": str(e)}
 
 ## return userId
-def idGenerator():
+def idGenerator(_length):
     try:
         print(" >> idGenerator() helper.")
         userId = currentDate()
-        userId = randomString(2) + userId + randomString(10)
+        userId = randomString(2) + userId + randomString(_length)
         return userId
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
@@ -493,7 +533,7 @@ def tokenGenerator(_user, _ilimited):
         print(" >> tokenGenerator() helper.")
         from datetime import datetime, timedelta
         current_date_time = datetime.now()
-        token = idGenerator()
+        token = idGenerator(10)
         if _ilimited:
             new_date_time = current_date_time + timedelta(days=180)
         else:
@@ -505,7 +545,7 @@ def tokenGenerator(_user, _ilimited):
             "username": _user
         }
         if tokens_ref.document(token).set(tobj):
-            return tobj
+            return token
         else: 
             return {"status": "Error", "errorStatus": "An error ocurred while creating the token, try again."}
     except Exception as e:
@@ -526,10 +566,10 @@ def tokenValidator(_user, _token):
                 expire_date = objauth['expire']
                 new_expire_date = datetime.strptime(expire_date, '%d%m%YH%M%S')
                 if new_current_date_time.date() < new_expire_date.date():
-                    return jsonify({"status": "valid"})
+                    return True
                 else: 
                     deleteToken(_token)
-                    return jsonify({"status": "expired"})
+                    return False
             except Exception as e:
                 return {"status": "error"}      
         else:
@@ -541,7 +581,7 @@ def tokenValidator(_user, _token):
 def deleteUserTokens(_un):
     print(" >> deleteUserTokens() helper.")
     ## search in firestore from tokens of currrent user
-    _tokens = tokens_ref.where('username', '==', _un)
+    _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _un))
     _tokens_count = 0
     ## for each token returned
     for _tok in _tokens.stream():
@@ -551,6 +591,25 @@ def deleteUserTokens(_un):
         _tokens_count += 1
     return _tokens_count
 
+
+## Get UserToken
+def getToken(_un):
+    try:
+        print(" >> getToken() helper.")
+        ## search in firestore from tokens of currrent user
+        _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _un))
+        _tokens_count = 0
+        for _tok in _tokens.stream():
+            ## if inside, _exists = true and delete current token
+            _token = _tok
+            _tokens_count += 1
+            _valid = tokenValidator(_un, _token.id)
+            if not _valid or _tokens_count > 1:
+                deleteToken(_tok.id)
+                return False
+        return _tok.id
+    except Exception as e:
+        return {"status": "An error Occurred", "error": str(e)}
 
 ## Delete Token
 def deleteToken(_id):
