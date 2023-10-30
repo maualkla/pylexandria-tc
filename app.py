@@ -109,7 +109,7 @@ def login():
     try:
         ### validate parameters
         if 'u' not in request.args or 'p' not in request.args:
-            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields"}), 400
+            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 400
         else: 
             ## save parameters into local vars, decode from b64 both password and user.
             _username = request.args.get('u')
@@ -134,11 +134,11 @@ def login():
                     ## return _token generated before, a transaction id and a 200 code.
                     return jsonify({"expire": "", "id": _token, "username": "", "trxId": trxGenerator(currentDate(), _username), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
                 else:
-                    return jsonify({"status": "Error", "code": "401", "reason": "Not Authorized, review user or password"}), 401
+                    return jsonify({"status": "Error", "code": "401", "reason": "Not Authorized, review user or password", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 401
             else:
-                return jsonify({"status": "Error", "code": "404", "reason": "Not Authorized, review user or password"}), 404
+                return jsonify({"status": "Error", "code": "404", "reason": "Not Authorized, review user or password", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 404
     except Exception as e: 
-        return {"status":"Error", "code": "500", "reason": str(e)}
+        return {"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
 
 ## Logout Service
 @app.route('/logout', methods=['GET'])
@@ -147,7 +147,7 @@ def logout():
         ### validate parameters
         if '_id' not in request.args or '_username' not in request.args:
             ## Return error response, missing required fields
-            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields"}), 400
+            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 400
         else: 
             ## get and decode the request parameter
             _username = request.args.get('_username')
@@ -157,11 +157,11 @@ def logout():
             trxGenerator(currentDate(), _username)
             ## Return 440 logout http response code.
             if _tokens > 0:
-                return jsonify({"status": "success", "code": "440", "reason": "session closed"}), 440
+                return jsonify({"status": "success", "code": "440", "reason": "session closed", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 440
             else:
-                return jsonify({"status": "error", "code": "404", "reason": "User not logged."}), 404
+                return jsonify({"status": "error", "code": "404", "reason": "User not logged.", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 404
     except Exception as e: 
-        return {"status":"Error", "code": "500", "reason": str(e)}
+        return {"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
 
 ## Sign up service
 @app.route('/signup', methods=['POST'])
@@ -492,18 +492,18 @@ def auth():
         ## Validate if required fields are in the json request.
         if 'id' not in request.json or 'username' not in request.json:
             ## Return error response, missing required fields
-            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields"}), 400
+            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 400
         else: 
             ## go to tokenValidator and retrieve a valid or expired status.
             _auth = tokenValidator(request.json['username'], request.json['id'])
             if _auth:
-                _response = {"status": "valid"}
+                _response = {"status": "valid", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
             else:
-                _response = {"status": "error"}
+                _response = {"status": "error", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
             ## return the tokenvalidator status and a 200 code.
             return _response, 200
     except Exception as e:
-        return {"status":"Error", "code": "500", "reason": str(e)}
+        return {"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
 
 ## API Status
 @app.route('/')
