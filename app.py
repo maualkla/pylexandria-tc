@@ -478,7 +478,10 @@ def transaction():
 def vauth():
     try:
         vauth = tokenValidator(request.json['username'], request.json['id'])
-        return jsonify({"status": vauth.json['status'], "alert": "this service is deprecated and will be removed by v0.03 - Use the /auth service instead."}), 200
+        if vauth:
+            return jsonify({"status": "valid", "alert": "this service is deprecated and will be removed by v0.03 - Use the /auth service instead."}), 200
+        else:
+            return jsonify({"status": "not-valid", "alert": "this service is deprecated and will be removed by v0.03 - Use the /auth service instead."}), 200
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
     
@@ -493,8 +496,12 @@ def auth():
         else: 
             ## go to tokenValidator and retrieve a valid or expired status.
             _auth = tokenValidator(request.json['username'], request.json['id'])
+            if _auth:
+                _response = {"status": "valid"}
+            else:
+                _response = {"status": "error"}
             ## return the tokenvalidator status and a 200 code.
-            return _auth, 200
+            return _response, 200
     except Exception as e:
         return {"status":"Error", "code": "500", "reason": str(e)}
 
