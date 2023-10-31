@@ -269,44 +269,45 @@ def user():
     try:
         ## Method: POST /user
         if request.method == 'POST':
-            ## Validate required values, first creating a list of all required
-            req_fields = ['username', 'bday', 'fname', 'pass', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type']
-            ## go and iterate to find all of them, if not _go will be false
-            _go = True
-            for req_value in req_fields:
-                if req_value not in request.json:
-                    _go = False
-
-            ## if go, start the sign up flow, else 400 code to indicate a bad request.
-            if _go:
-                ## Get email from request.json
-                s_email = request.json['email']
-                ## Query email to see if the user is yet created.
-                user = users_ref.document(s_email).get()
-                user = user.to_dict()
-                ## if user == None means user is not yet created, so flow continues, else return 409 indicating email already registered.
-                if user == None:
-                    ## get pass from payload and decode 64 and then encrypt
-                    _user_post_params = ['activate','username','bday','email','fname','phone','pin','plan','postalCode','terms','type']
-                    _pcode = request.json['pass']
-                    _pcode = b64Decode(_pcode)
-                    _pwrd = encrypt(_pcode)
-                    ## Create object to create the new user.
-                    _objpay = {}
-                    for _x in _user_post_params:
-                        _objpay[_x] = request.json[_x]
-                    _objpay['pass'] = _pwrd
-                    ## Get current date
-                    _tempdate = str(currentDate())
-                    ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
-                    if users_ref.document(s_email).set(_objpay):
-                        return jsonify({"trxId": trxGenerator(_tempdate,s_email)}), 202
+            _auth = True if request.headers.get('SessionId') and request.headers.get('TokenId') else False
+            if _auth:
+                ## Validate required values, first creating a list of all required
+                req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
+                ## go and iterate to find all of them, if not _go will be false
+                _go = True
+                for req_value in req_fields:
+                    if req_value not in request.json:
+                        _go = False
+                ## if go, start the sign up flow, else 400 code to indicate a bad request.
+                if _go:
+                    ## Get email from request.json
+                    s_email = request.json['email']
+                    ## Query email to see if the user is yet created.
+                    user = users_ref.document(s_email).get()
+                    user = user.to_dict()
+                    ## if user == None means user is not yet created, so flow continues, else return 409 indicating email already registered.
+                    if user == None:
+                        ## get pass from payload and decode 64 and then encrypt
+                        _user_post_params = ['activate','username','bday','email','fname','phone','pin','plan','postalCode','terms','type', 'tenant']
+                        _pcode = request.json['pass']
+                        _pwrd = encrypt(b64Decode(_pcode))
+                        _pcode = ""
+                        ## Create object to create the new user.
+                        _objpay = {}
+                        for _x in _user_post_params:
+                            _objpay[_x] = request.json[_x]
+                        _objpay['pass'] = _pwrd
+                        ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
+                        if users_ref.document(s_email).set(_objpay):
+                            return jsonify({"trxId": trxGenerator(str(currentDate()),s_email)}), 202
+                        else:
+                            return jsonify({"status": "Error", "code": 500, "reason": "Error while creating user. "}), 500
                     else:
-                        return jsonify({"status": "Error", "code": "500", "reason": "Error while creating user. "}), 500
-                else:
-                    return jsonify({"status": "Error", "code": "409", "reason": "Email already registered" }), 409
+                        return jsonify({"status": "Error", "code": 409, "reason": "Email already registered" }), 409
+                else: 
+                    return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
             else: 
-                return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields"}), 400
+                return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
             ## validate minimum characters.
