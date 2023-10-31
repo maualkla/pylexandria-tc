@@ -39,7 +39,26 @@ def session():
     try:
         ## Method: GET /session
         if request.method == 'GET':
-            return "GET"
+            ## Get Logic.
+            _authorized = True if request.headers.get('SessionId') and request.headers.get('browserVersion') and request.headers.get('clientIP') else False
+            if _authorized:
+                _response = {
+                            "containsData": True,
+                            "count": 1,
+                            "items": [{
+                                "id": "",
+                                "tokenId": request.headers.get('SessionId'),
+                                "userId": "string", 
+                                "clientIP": "string",
+                                "clientVersion": "string",
+                            }],
+                            "limit": 10,
+                            "query": "limit=10"
+                            }
+                return _response
+            else:
+                return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Authentication"}), 422
+            return "GET en construcción"
         ## Method: POST /session (New Login)
         elif request.method == 'POST': 
             ## Validate if the required structure is present.
