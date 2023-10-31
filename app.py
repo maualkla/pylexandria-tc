@@ -124,9 +124,17 @@ def session():
                     return jsonify({"status": "Error", "code": 403, "reason": "Missing Requested Parameters"}), 403
             else:
                 return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Data Structure"}), 422
-        ## Method: DELETE /session
+        ## Method: DELETE /session (new logout)
         elif request.method == 'DELETE': 
-            return "DELETE"
+            print (" (1) entramos en delete ")
+            _requested_params = True if request.headers.get('SessionId') else False
+            if _requested_params:
+                print (" (2) entramos en la validacion de parametros")
+                _deleted = deleteSession(request.headers.get('SessionId'))
+                print (" (3) Lets return the resposnse")
+                return jsonify({"status": "logued Out", "deleted": _deleted}), 200
+            else:
+                return jsonify({"status": "Error", "code": 403, "reason": "Missing Requested Parameters"}), 403
         else:
             return jsonify({"status": "Error", "code": 405, "reason": "Method Not Allowed"}), 405
     except Exception as e: 
