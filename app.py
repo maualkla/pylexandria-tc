@@ -2,9 +2,9 @@
 ## Pylexandria Project.
 ## Coded by: Mauricio Alcala (@maualkla)
 ## Creation Date: May 2023.
-## Current Version: 0.02
-## Last Modification Date: July 2023.
-## More info at @intmau in twitter or in http://maualkla.com
+## Current Version: 0.03
+## Last Modification Date: Oct 2023.
+## More info at @intmau in X.com or in http://py.maualkla.com
 ## Description: API for the services required by the adminde-tc proyect.
 
 ## Imports
