@@ -115,29 +115,38 @@ def session():
                                 ## In case of an error updating the user, retrieve a error message.
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Session object failed to be created."}), 500
+                            ## In case session was created successflly returns trx code and session id
                             return jsonify({"_session_id": _idg, "trxId": trxGenerator(currentDate(), _sess_params[0])}), 200
                         else:
+                            ## in case passwords do not match
                             return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
                     else:
+                        ## in case user is not registered.
                         return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
                 else:
+                    ## In case of structure not compliying with what is requested.
                     return jsonify({"status": "Error", "code": 403, "reason": "Missing Requested Parameters"}), 403
             else:
+                ## In case params are not present
                 return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Data Structure"}), 422
         ## Method: DELETE /session (new logout)
         elif request.method == 'DELETE': 
-            print (" (1) entramos en delete ")
+            ## Validate if SessionId was sent as header. True if yes, else will set False.
             _requested_params = True if request.headers.get('SessionId') else False
+            ## Validate the flow 
             if _requested_params:
-                print (" (2) entramos en la validacion de parametros")
+                ## If requested parameter exist, delete the session.
                 _deleted = deleteSession(request.headers.get('SessionId'))
-                print (" (3) Lets return the resposnse")
+                ## returns a 200 signaling the session end
                 return jsonify({"status": "logued Out", "deleted": _deleted}), 200
             else:
+                ## In case requested params not present
                 return jsonify({"status": "Error", "code": 403, "reason": "Missing Requested Parameters"}), 403
         else:
+            ## In case method sent was not alllowed.
             return jsonify({"status": "Error", "code": 405, "reason": "Method Not Allowed"}), 405
     except Exception as e: 
+        ## In case of error.
         return {"status":"Error", "code": 500, "reason": str(e)}
 
 ## Login service (deprecated)
@@ -683,6 +692,8 @@ def deleteSession(_id):
         else: 
             return False
     except Exception as e:
+        print ( "(!) Exception in function: deleteSession() ")
+        print (e)
         return {"status": "An error Occurred", "error": str(e)}
 
 ########################################
