@@ -299,14 +299,19 @@ def user():
                         _objpay['pass'] = _pwrd
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email).set(_objpay):
+                            ## If true means the user were created successfully. Return the trx code.
                             return jsonify({"trxId": trxGenerator(str(currentDate()),s_email)}), 202
                         else:
+                            ## The user wasnt created and the service returned a error.
                             return jsonify({"status": "Error", "code": 500, "reason": "Error while creating user. "}), 500
                     else:
+                        ## The user already exists. Email already registered.
                         return jsonify({"status": "Error", "code": 409, "reason": "Email already registered" }), 409
                 else: 
+                    ## There are missing required fields.
                     return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
             else: 
+                ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
