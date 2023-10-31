@@ -269,7 +269,10 @@ def user():
     try:
         ## Method: POST /user
         if request.method == 'POST':
+            ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                ## for the use case where we should allow all request to create a new user.
                 _auth = True ##validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
             else: 
                 ## Fixed to true to allow outside calls to log in to the system,
@@ -319,8 +322,11 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
+            ## Validate if the headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## If headers present, call to validateSession to know if it is a valid authorization,
                 _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
                 if _auth == False: deleteSession(request.headers.get('TokenId'))
             else: 
                 _auth = False
