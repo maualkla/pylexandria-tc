@@ -41,10 +41,16 @@ def session():
         if request.method == 'GET':
             ## validate the required params for the service to return a valid response.
             _authorized = True if request.headers.get('SessionId') and request.headers.get('browserVersion') and request.headers.get('clientIP') else False
+            ## If all the required params are there, the _auth variable is True, Else is False.
             if _authorized:
+                ## Go and search for the Session Id in the request. 
+                ## @TODO in this place we should add a validation to get more than one session in the future.
                 _sess = sess_ref.document(request.headers.get('SessionId')).get().to_dict()
+                ## In case _session exists
                 if _sess != None:
+                    ## Validate the client version and ip are the same. 
                     if _sess['clientVersion'] == request.headers.get('browserVersion') and _sess['clientIp'] == request.headers.get('clientIp'):
+                        ## if client version and ip are the same, the response is build and send back to the requester
                         _json_data_block = {"items": []}
                         _json_data_block["items"].append(_sess)
                         _json_data_block["limit"] = 1
@@ -53,11 +59,15 @@ def session():
                         _json_data_block["query"] = ""
                         return jsonify(_json_data_block), 200
                     else:
+                        ## if client version or ip are not same as recorded in backend, session is deleted and user has to 
+                        ## login back again creating a new session. 
                         deleteSession(request.headers.get('SessionId'))
-                        return jsonify({"status": "error", "code": 401, "reason": "Session is not valid. "}), 401
+                        return jsonify({"status": "error", "code": 401, "reason": "Invalid authorization "}), 401
                 else: 
-                    return jsonify({"status": "error", "code": 404, "reason": "Session is not valid. "}), 404
+                    ## In case there is no session with that session id returns 401
+                    return jsonify({"status": "error", "code": 401, "reason": "Invalid authorization "}), 401
             else:
+                ## in case, missing parameters to start the flow.
                 return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Authentication"}), 422
         ## Method: POST /session (New Login)
         elif request.method == 'POST': 
