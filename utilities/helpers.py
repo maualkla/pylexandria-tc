@@ -4,7 +4,7 @@ class Helpers:
     ## return String (lenght)
     def randomString(_length):
         try:
-            print(" >> randomString() helper.")
+            print(" >> helpers.randomString() helper.")
             import random, string
             output_str = ''.join(random.choice(string.ascii_letters) for i in range(_length))
             return output_str
