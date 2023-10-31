@@ -39,26 +39,26 @@ def session():
     try:
         ## Method: GET /session
         if request.method == 'GET':
-            ## Get Logic.
+            ## validate the required params for the service to return a valid response.
             _authorized = True if request.headers.get('SessionId') and request.headers.get('browserVersion') and request.headers.get('clientIP') else False
             if _authorized:
-                _response = {
-                            "containsData": True,
-                            "count": 1,
-                            "items": [{
-                                "id": "",
-                                "tokenId": request.headers.get('SessionId'),
-                                "userId": "string", 
-                                "clientIP": "string",
-                                "clientVersion": "string",
-                            }],
-                            "limit": 10,
-                            "query": "limit=10"
-                            }
-                return _response
+                _sess = sess_ref.document(request.headers.get('SessionId')).get().to_dict()
+                if _sess != None:
+                    if _sess['clientVersion'] == request.headers.get('browserVersion') and _sess['clientIp'] == request.headers.get('clientIp'):
+                        _json_data_block = {"items": []}
+                        _json_data_block["items"].append(_sess)
+                        _json_data_block["limit"] = 1
+                        _json_data_block["count"] = 1
+                        _json_data_block["containsData"] = True 
+                        _json_data_block["query"] = ""
+                        return jsonify(_json_data_block), 200
+                    else:
+                        deleteSession(request.headers.get('SessionId'))
+                        return jsonify({"status": "error", "code": 401, "reason": "Session is not valid. "}), 401
+                else: 
+                    return jsonify({"status": "error", "code": 404, "reason": "Session is not valid. "}), 404
             else:
                 return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Authentication"}), 422
-            return "GET en construcción"
         ## Method: POST /session (New Login)
         elif request.method == 'POST': 
             ## Validate if the required structure is present.
@@ -649,6 +649,18 @@ def deleteToken(_id):
     try:
         print(" >> deleteToken() helper.")
         if tokens_ref.document(_id).delete():
+            return True
+        else: 
+            return False
+    except Exception as e:
+        return {"status": "An error Occurred", "error": str(e)}
+    
+
+## Session Services ####################
+def deleteSession(_id):
+    try:
+        print(" >> deleteSession() helper.")
+        if sess_ref.document(_id).delete():
             return True
         else: 
             return False
