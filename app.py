@@ -12,6 +12,7 @@ from flask import Flask, jsonify, request
 from firebase_admin import credentials, firestore, initialize_app
 from google.cloud.firestore_v1.base_query import FieldFilter
 from config import Config
+from utilities.helpers import Helpers
 import rsa, bcrypt, base64, json
 
 ## Initiate Public and private key
@@ -91,7 +92,7 @@ def session():
                         ## Get the firebase_response_user object. It also is decoded.
                         _fire = _user['pass'].decode('utf-8')
                         ## Generate the ID for this session.
-                        _idg = idGenerator(15)
+                        _idg = Helpers.idGenerator(15)
                         ## Validate if the pass is the same in the request as it is in the firebase_object
                         if _requ == _fire:
                             ## Get the user token. In case exist it will retrieve the tokenId. Else return False.
