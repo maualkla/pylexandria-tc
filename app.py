@@ -39,7 +39,36 @@ def session():
     try:
         ## Method: GET /session
         if request.method == 'GET':
-            return "GET"
+            ## validate the required params for the service to return a valid response.
+            _authorized = True if request.headers.get('SessionId') and request.headers.get('browserVersion') and request.headers.get('clientIP') else False
+            ## If all the required params are there, the _auth variable is True, Else is False.
+            if _authorized:
+                ## Go and search for the Session Id in the request. 
+                ## @TODO in this place we should add a validation to get more than one session in the future.
+                _sess = sess_ref.document(request.headers.get('SessionId')).get().to_dict()
+                ## In case _session exists
+                if _sess != None:
+                    ## Validate the client version and ip are the same. 
+                    if _sess['clientVersion'] == request.headers.get('browserVersion') and _sess['clientIp'] == request.headers.get('clientIp'):
+                        ## if client version and ip are the same, the response is build and send back to the requester
+                        _json_data_block = {"items": []}
+                        _json_data_block["items"].append(_sess)
+                        _json_data_block["limit"] = 1
+                        _json_data_block["count"] = 1
+                        _json_data_block["containsData"] = True 
+                        _json_data_block["query"] = ""
+                        return jsonify(_json_data_block), 200
+                    else:
+                        ## if client version or ip are not same as recorded in backend, session is deleted and user has to 
+                        ## login back again creating a new session. 
+                        deleteSession(request.headers.get('SessionId'))
+                        return jsonify({"status": "error", "code": 401, "reason": "Invalid authorization "}), 401
+                else: 
+                    ## In case there is no session with that session id returns 401
+                    return jsonify({"status": "error", "code": 401, "reason": "Invalid authorization "}), 401
+            else:
+                ## in case, missing parameters to start the flow.
+                return jsonify({"status": "Error", "code": 422, "reason": "Missing Required Authentication"}), 422
         ## Method: POST /session (New Login)
         elif request.method == 'POST': 
             ## Validate if the required structure is present.
@@ -635,6 +664,18 @@ def deleteToken(_id):
             return False
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
+    
+
+## Session Services ####################
+def deleteSession(_id):
+    try:
+        print(" >> deleteSession() helper.")
+        if sess_ref.document(_id).delete():
+            return True
+        else: 
+            return False
+    except Exception as e:
+        return {"status": "An error Occurred", "error": str(e)}
 
 ########################################
 ### Helpers ############################
@@ -737,4 +778,4 @@ def currentDate():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8080)
