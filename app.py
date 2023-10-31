@@ -269,7 +269,11 @@ def user():
     try:
         ## Method: POST /user
         if request.method == 'POST':
-            _auth = True if request.headers.get('SessionId') and request.headers.get('TokenId') else False
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                _auth = True ##validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = True
             if _auth:
                 ## Validate required values, first creating a list of all required
                 req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
@@ -315,53 +319,62 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
-            ## validate minimum characters.
-            if 'email' in request.json:
-                ## get reference for user to update
-                _user_to_update = users_ref.document(request.json['email'])
-                ## Create json template for the payload
-                _json_template = '{ }'
-                ## Load the json payload 
-                _json_payload = json.loads(_json_template)
-                ## Set an array with all required fields.
-                req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type']
-                ## define a flag to send or not the request.
-                _go = False
-                ## Create a for loop addressing all the required fields
-                for req_value in req_fields:
-                    ## In case required field in json payload 
-                    if req_value in request.json:
-                        ## update _json_payload object adding current field.
-                        _json_payload.update({req_value: request.json[req_value]})
-                        ## update flag to update user
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                if _auth == False: deleteSession(request.headers.get('TokenId'))
+            else: 
+                _auth = False
+            if _auth:
+                ## validate minimum characters.
+                if 'email' in request.json:
+                    ## get reference for user to update
+                    _user_to_update = users_ref.document(request.json['email'])
+                    ## Create json template for the payload
+                    _json_template = '{ }'
+                    ## Load the json payload 
+                    _json_payload = json.loads(_json_template)
+                    ## Set an array with all required fields.
+                    req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type']
+                    ## define a flag to send or not the request.
+                    _go = False
+                    ## Create a for loop addressing all the required fields
+                    for req_value in req_fields:
+                        ## In case required field in json payload 
+                        if req_value in request.json:
+                            ## update _json_payload object adding current field.
+                            _json_payload.update({req_value: request.json[req_value]})
+                            ## update flag to update user
+                            _go = True
+                    ## in case the user wants to update the password.
+                    if 'pass' in request.json:
+                        ## decoding base 64 pass.
+                        _encoded_pass = b64Decode(request.json['pass'])
+                        ## Encryting pass
+                        _encoded_pass = encrypt(_encoded_pass)
+                        ## Appending to the payoad
+                        _json_payload.update({"pass": _encoded_pass})
+                        ## updating flag
                         _go = True
-                ## in case the user wants to update the password.
-                if 'pass' in request.json:
-                    ## decoding base 64 pass.
-                    _encoded_pass = b64Decode(request.json['pass'])
-                    ## Encryting pass
-                    _encoded_pass = encrypt(_encoded_pass)
-                    ## Appending to the payoad
-                    _json_payload.update({"pass": _encoded_pass})
-                    ## updating flag
-                    _go = True
-                ## If _go == True send request, else send error message
-                if _go:
-                    try:
-                        ## the user is updated with the request just generated.
-                        _response = _user_to_update.update(_json_payload)
-                    except Exception as e:
-                        ## In case of an error updating the user, retrieve a error message.
-                        print('(!) >> Handled external service exception: ' + str(e) )
-                        return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), 500
-                    ## Generate a transaction record.
-                    _trxId = trxGenerator(currentDate(), request.json['email'])
-                    ## In case all went smooth, return a successful message.
-                    return jsonify({"status": "success", "code": "202", "reason": "User information updated successfully.", "trxId": _trxId}), 202
-                else: 
-                    return jsonify({"status": "Error", "code": "400", "reason": "Send at least one field to be updated."}), 400
+                    ## If _go == True send request, else send error message
+                    if _go:
+                        try:
+                            ## the user is updated with the request just generated.
+                            _response = _user_to_update.update(_json_payload)
+                        except Exception as e:
+                            ## In case of an error updating the user, retrieve a error message.
+                            print('(!) >> Handled external service exception: ' + str(e) )
+                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), 500
+                        ## Generate a transaction record.
+                        _trxId = trxGenerator(currentDate(), request.json['email'])
+                        ## In case all went smooth, return a successful message.
+                        return jsonify({"status": "success", "code": "202", "reason": "User information updated successfully.", "trxId": _trxId}), 202
+                    else: 
+                        return jsonify({"status": "Error", "code": "400", "reason": "Send at least one field to be updated."}), 400
+                else:
+                    return jsonify({"status": "Error", "code": "400", "reason": "Review request payload"}), 400
             else:
-                return jsonify({"status": "Error", "code": "400", "reason": "Review request payload"}), 400
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /user
         elif request.method == 'GET': 
             ## list all the values to be returned in the get object.
@@ -700,7 +713,23 @@ def deleteSession(_id):
     except Exception as e:
         print ( "(!) Exception in function: deleteSession() ")
         print (e)
-        return {"status": "An error Occurred", "error": str(e)}
+        return False
+
+def validateSession(_id, _tokenid):
+    try:
+        _sess = sess_ref.document(_id).get()        
+        if _sess != None:
+            _dicted = _sess.to_dict()
+            if _dicted['tokenId'] == _tokenid:
+                return True
+            else:
+                return False
+        else:
+            return False
+    except Exception as e:
+        print ( "(!) Exception in function: validateSession() ")
+        print (e)
+        return False
 
 ########################################
 ### Helpers ############################
