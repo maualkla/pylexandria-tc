@@ -397,8 +397,17 @@ def user():
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## Define _limit, _count, containsData and query
-                _query = "" if 'filter' not in request.args else request.args.get('filter')
-                _limit = 10 if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
+                _query = False if 'filter' not in request.args else request.args.get('filter')
+                
+                _limit =  10 ##if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
+                if _query:
+                    _parameters = Helpers.splitParams(_query)
+                    print(_parameters)
+                    return jsonify({"status": "service in repair. Try later."}), 200
+
+                    
+                        
+                
                 _containsData = False
                 _count = 0
                 ## Loop in all the users inside the users_ref object

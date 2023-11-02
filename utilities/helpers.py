@@ -78,3 +78,19 @@ class Helpers:
             return _now
         except Exception as e:
             return {"status": "An error Occurred", "error": str(e)}
+        
+    ## Get URL parameters:
+    ## Function receive a string like this "limit:10;username:maualkla;active:true"
+    ## Has to return a dict containing {"parameter" : "value"}
+    def splitParams(_query):
+        _x = 0
+        _params_in_query = _query.count(":")
+        _response = {}
+        while _x < _params_in_query:
+            _index = _query.find(";")
+            _temp = _query[0:_index]
+            _index_t = _temp.find(":")
+            _response[_temp[0:_index_t]] = _temp[_index_t+1:]
+            _query = _query[_index+1:]
+            _x += 1
+        return _response
