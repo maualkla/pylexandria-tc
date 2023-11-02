@@ -388,6 +388,8 @@ def user():
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
                 ## In case are present, call validate session. True if valid, else not valid. Fixed to true
                 _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
             else: 
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
@@ -417,7 +419,7 @@ def user():
                         _search = _search.where(filter=FieldFilter("activate", "==", True))
                 elif _active:
                     print(3)
-                    _search = users_ref.where(filter=FieldFilter("activate", "==", "true"))
+                    _search = users_ref.where(filter=FieldFilter("activate", "==", True))
                 else:
                     print(4)
                     _search = users_ref
