@@ -398,20 +398,31 @@ def user():
                 _json_data_block = {"items": []}
                 ## Define _limit, _count, containsData and query
                 _query = False if 'filter' not in request.args else request.args.get('filter')
-                
+                _id = False if 'id' not in request.args else request.args.get('id')
                 _limit =  10 ##if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
                 if _query:
                     _parameters = Helpers.splitParams(_query)
-                    print(_parameters)
-                    return jsonify({"status": "service in repair. Try later."}), 200
-
-                    
-                        
-                
-                _containsData = False
+                    _limit = int(_parameters['limit']) if 'limit' in _parameters else 10
+                    _username = str(_parameters['username']) if 'username' in _parameters else False
+                    _active = bool(_parameters['active']) if 'active' in _parameters else False
                 _count = 0
                 ## Loop in all the users inside the users_ref object
-                for _us in users_ref.stream():
+                if _id:
+                    print(1)
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                elif _username:
+                    print(2)
+                    _search = users_ref.where(filter=FieldFilter("username", "==", _username))
+                    if _active:
+                        _search = _search.where(filter=FieldFilter("activate", "==", True))
+                elif _active:
+                    print(3)
+                    _search = users_ref.where(filter=FieldFilter("activate", "==", "true"))
+                else:
+                    print(4)
+                    _search = users_ref
+                for _us in _search.stream():
+                    print(5)
                     ## set the temporal json_blocl
                     _json_block_l = {}
                     ## apply the to_dict() to the current user to use their information.
@@ -430,7 +441,7 @@ def user():
                 _json_data_block["count"] = _count
                 ## In case count > 0 it returns True, else False.
                 _json_data_block["containsData"] = True if _count > 0 else False 
-                _json_data_block["query"] = ""
+                _json_data_block["query"] = _query
                 return jsonify(_json_data_block), 200
             else:
                 ## Missing authorization headers.

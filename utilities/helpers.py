@@ -91,7 +91,10 @@ class Helpers:
                 _response = {}
                 while _x < _params_in_query:
                     _index = _query.find(";")
-                    _temp = _query[0:_index]
+                    if _index == -1: 
+                        _temp = _query[0:]
+                    else: 
+                        _temp = _query[0:_index]
                     _index_2 = _temp.find(":")
                     _response[_temp[0:_index_2]] = _temp[_index_2+1:]
                     _query = _query[_index+1:]
