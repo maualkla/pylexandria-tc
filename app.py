@@ -384,37 +384,48 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /user
         elif request.method == 'GET': 
-            ## list all the values to be returned in the get object.
-            _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type'] 
-            ### Set the base for the json block to be returned. Define the data index for the list of users
-            _json_data_block = {"items": []}
-            ## Define _limit, _count, containsData and query
-            _query = ""
-            _limit = 10 if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
-            _containsData = False
-            _count = 0
-            ## Loop in all the users inside the users_ref object
-            for _us in users_ref.stream():
-                ## set the temporal json_blocl
-                _json_block_l = {}
-                ## apply the to_dict() to the current user to use their information.
-                _acc = _us.to_dict()
-                ## Add a +1 to the count
-                _count += 1
-                ## Iterates into the _user_fields object to generate the json object for that user.
-                for _x in _user_fields:
-                    ## Generates the json object.
-                    _json_block_l[_x] = _acc[_x]
-                ## Each iteration, append the user block to the main payload.
-                _json_data_block["items"].append(_json_block_l)
-                if _count+1 > _limit: break
-            ## Before return a response, adding parameters for the get.
-            _json_data_block["limit"] = _limit
-            _json_data_block["count"] = _count
-            ## In case count > 0 it returns True, else False.
-            _json_data_block["containsData"] = True if _count > 0 else False 
-            _json_data_block["query"] = ""
-            return jsonify(_json_data_block), 200
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                ## list all the values to be returned in the get object.
+                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type'] 
+                ### Set the base for the json block to be returned. Define the data index for the list of users
+                _json_data_block = {"items": []}
+                ## Define _limit, _count, containsData and query
+                _query = "" if 'filter' not in request.args else request.args.get('filter')
+                _limit = 10 if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
+                _containsData = False
+                _count = 0
+                ## Loop in all the users inside the users_ref object
+                for _us in users_ref.stream():
+                    ## set the temporal json_blocl
+                    _json_block_l = {}
+                    ## apply the to_dict() to the current user to use their information.
+                    _acc = _us.to_dict()
+                    ## Add a +1 to the count
+                    _count += 1
+                    ## Iterates into the _user_fields object to generate the json object for that user.
+                    for _x in _user_fields:
+                        ## Generates the json object.
+                        _json_block_l[_x] = _acc[_x]
+                    ## Each iteration, append the user block to the main payload.
+                    _json_data_block["items"].append(_json_block_l)
+                    if _count+1 > _limit: break
+                ## Before return a response, adding parameters for the get.
+                _json_data_block["limit"] = _limit
+                _json_data_block["count"] = _count
+                ## In case count > 0 it returns True, else False.
+                _json_data_block["containsData"] = True if _count > 0 else False 
+                _json_data_block["query"] = ""
+                return jsonify(_json_data_block), 200
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
         print (e)
         return jsonify({"status":"Error", "code": "500", "reason": str(e)}), 500
