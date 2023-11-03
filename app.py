@@ -341,7 +341,7 @@ def user():
                     ## Load the json payload 
                     _json_payload = json.loads(_json_template)
                     ## Set an array with all required fields.
-                    req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type']
+                    req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
                     ## define a flag to send or not the request.
                     _go = False
                     ## Create a for loop addressing all the required fields
@@ -384,37 +384,84 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /user
         elif request.method == 'GET': 
-            ## list all the values to be returned in the get object.
-            _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type'] 
-            ### Set the base for the json block to be returned. Define the data index for the list of users
-            _json_data_block = {"items": []}
-            ## Define _limit, _count, containsData and query
-            _query = ""
-            _limit = 10 if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
-            _containsData = False
-            _count = 0
-            ## Loop in all the users inside the users_ref object
-            for _us in users_ref.stream():
-                ## set the temporal json_blocl
-                _json_block_l = {}
-                ## apply the to_dict() to the current user to use their information.
-                _acc = _us.to_dict()
-                ## Add a +1 to the count
-                _count += 1
-                ## Iterates into the _user_fields object to generate the json object for that user.
-                for _x in _user_fields:
-                    ## Generates the json object.
-                    _json_block_l[_x] = _acc[_x]
-                ## Each iteration, append the user block to the main payload.
-                _json_data_block["items"].append(_json_block_l)
-                if _count+1 > _limit: break
-            ## Before return a response, adding parameters for the get.
-            _json_data_block["limit"] = _limit
-            _json_data_block["count"] = _count
-            ## In case count > 0 it returns True, else False.
-            _json_data_block["containsData"] = True if _count > 0 else False 
-            _json_data_block["query"] = ""
-            return jsonify(_json_data_block), 200
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                ## list all the values to be returned in the get object.
+                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant'] 
+                ### Set the base for the json block to be returned. Define the data index for the list of users
+                _json_data_block = {"items": []}
+                ## If query filter present in url params it will save it, else will set False.
+                _query = False if 'filter' not in request.args else request.args.get('filter')
+                ## If id filter present in url params it will save it, else will set false.
+                _id = False if 'id' not in request.args else request.args.get('id')
+                ## set default value for limit and count. 
+                _limit =  10 
+                _count = 0
+                ## Validate if _query present
+                if _query:
+                    ## calls to splitParams sending the _query form the request. If query correct returns a 
+                    ## dictionary with the params as key value.
+                    _parameters = Helpers.splitParams(_query)
+                    ## if limit param present set the limit value
+                    _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
+                    ## if username param present, set the username param
+                    _username = str(_parameters['username']) if 'username' in _parameters else False
+                    ## if active param present validates the str value, if true seet True, else set False. if not present, 
+                    ## sets _active to "N" to ignore the value
+                    if 'active' in _parameters:
+                        _active = True if str(_parameters['active']).lower() == 'true' else False
+                    else: 
+                        _active = "N"
+                ## Validate the 4 possible combinations for the query of the users search
+                if _id:
+                    ## The case of id is present will search for that specific email
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                elif _username:
+                    ## The case username is present, will search with the specific username. 
+                    _search = users_ref.where(filter=FieldFilter("username", "==", _username))
+                    if _active != "N":
+                        ## In case the _active param is present in valid fashion, will search for active or inactiv
+                        ## e users.
+                        _search = _search.where(filter=FieldFilter("activate", "==", _active))
+                elif _active != "N":
+                    ## In case activate is present, will search for active or inactive users.
+                    _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
+                else:
+                    ## In case any param was present, will search all
+                    _search = users_ref
+                ## Loop in all the users inside the users_ref object
+                for _us in _search.stream():
+                    ## set the temporal json_blocl
+                    _json_block_l = {}
+                    ## apply the to_dict() to the current user to use their information.
+                    _acc = _us.to_dict()
+                    ## Add a +1 to the count
+                    _count += 1
+                    ## Iterates into the _user_fields object to generate the json object for that user.
+                    for _x in _user_fields:
+                        ## Generates the json object.
+                        _json_block_l[_x] = _acc[_x]
+                    ## Each iteration, append the user block to the main payload.
+                    _json_data_block["items"].append(_json_block_l)
+                    if _count+1 > _limit: break
+                ## Before return a response, adding parameters for the get.
+                _json_data_block["limit"] = _limit
+                _json_data_block["count"] = _count
+                ## In case count > 0 it returns True, else False.
+                _json_data_block["containsData"] = True if _count > 0 else False 
+                _json_data_block["query"] = _query
+                return jsonify(_json_data_block), 200
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
         print (e)
         return jsonify({"status":"Error", "code": "500", "reason": str(e)}), 500
