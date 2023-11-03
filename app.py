@@ -265,7 +265,7 @@ def signup():
         return {"status": "An error Occurred", "error": str(e)}
     
 ## user service
-@app.route('/user', methods=['POST','PUT','GET'])
+@app.route('/user', methods=['POST','PUT','GET','DELETE'])
 def user():
     try:
         ## Method: POST /user
@@ -462,6 +462,8 @@ def user():
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+        elif request.method == 'DELETE':
+            return "delete"
     except Exception as e:
         print (e)
         return jsonify({"status":"Error", "code": "500", "reason": str(e)}), 500
