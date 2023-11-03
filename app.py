@@ -406,7 +406,11 @@ def user():
                     _parameters = Helpers.splitParams(_query)
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else 10
                     _username = str(_parameters['username']) if 'username' in _parameters else False
-                    _active = bool(_parameters['active']) if 'active' in _parameters else False
+                    if 'active' in _parameters:
+                        _active = True if str(_parameters['active']).lower() == 'true' else False
+                    else: 
+                        _active = "N"
+                    print(_active)
                 _count = 0
                 ## Loop in all the users inside the users_ref object
                 if _id:
@@ -415,11 +419,11 @@ def user():
                 elif _username:
                     print(2)
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
-                    if _active:
-                        _search = _search.where(filter=FieldFilter("activate", "==", True))
-                elif _active:
+                    if _active != "N":
+                        _search = _search.where(filter=FieldFilter("activate", "==", _active))
+                elif _active != "N":
                     print(3)
-                    _search = users_ref.where(filter=FieldFilter("activate", "==", True))
+                    _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
                 else:
                     print(4)
                     _search = users_ref
