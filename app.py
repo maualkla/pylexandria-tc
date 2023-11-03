@@ -341,7 +341,7 @@ def user():
                     ## Load the json payload 
                     _json_payload = json.loads(_json_template)
                     ## Set an array with all required fields.
-                    req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type']
+                    req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
                     ## define a flag to send or not the request.
                     _go = False
                     ## Create a for loop addressing all the required fields
@@ -395,33 +395,49 @@ def user():
                 _auth = False
             if _auth:
                 ## list all the values to be returned in the get object.
-                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type'] 
+                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant'] 
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
-                ## Define _limit, _count, containsData and query
+                ## If query filter present in url params it will save it, else will set False.
                 _query = False if 'filter' not in request.args else request.args.get('filter')
+                ## If id filter present in url params it will save it, else will set false.
                 _id = False if 'id' not in request.args else request.args.get('id')
-                _limit =  10 ##if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
+                ## set default value for limit and count. 
+                _limit =  10 
+                _count = 0
+                ## Validate if _query present
                 if _query:
+                    ## calls to splitParams sending the _query form the request. If query correct returns a 
+                    ## dictionary with the params as key value.
                     _parameters = Helpers.splitParams(_query)
-                    _limit = int(_parameters['limit']) if 'limit' in _parameters else 10
+                    ## if limit param present set the limit value
+                    _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
+                    ## if username param present, set the username param
                     _username = str(_parameters['username']) if 'username' in _parameters else False
+                    ## if active param present validates the str value, if true seet True, else set False. if not present, 
+                    ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
                         _active = True if str(_parameters['active']).lower() == 'true' else False
                     else: 
                         _active = "N"
-                _count = 0
-                ## Loop in all the users inside the users_ref object
+                ## Validate the 4 possible combinations for the query of the users search
                 if _id:
+                    ## The case of id is present will search for that specific email
                     _search = users_ref.where(filter=FieldFilter("email", "==", _id))
                 elif _username:
+                    ## The case username is present, will search with the specific username. 
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
                     if _active != "N":
+                        ## In case the _active param is present in valid fashion, will search for active or inactiv
+                        ## e users.
                         _search = _search.where(filter=FieldFilter("activate", "==", _active))
                 elif _active != "N":
+                    ## In case activate is present, will search for active or inactive users.
                     _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
                 else:
+                    ## In case any param was present, will search all
                     _search = users_ref
+                ## Loop in all the users inside the users_ref object
                 for _us in _search.stream():
                     ## set the temporal json_blocl
                     _json_block_l = {}
