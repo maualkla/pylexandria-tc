@@ -410,25 +410,19 @@ def user():
                         _active = True if str(_parameters['active']).lower() == 'true' else False
                     else: 
                         _active = "N"
-                    print(_active)
                 _count = 0
                 ## Loop in all the users inside the users_ref object
                 if _id:
-                    print(1)
                     _search = users_ref.where(filter=FieldFilter("email", "==", _id))
                 elif _username:
-                    print(2)
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
                     if _active != "N":
                         _search = _search.where(filter=FieldFilter("activate", "==", _active))
                 elif _active != "N":
-                    print(3)
                     _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
                 else:
-                    print(4)
                     _search = users_ref
                 for _us in _search.stream():
-                    print(5)
                     ## set the temporal json_blocl
                     _json_block_l = {}
                     ## apply the to_dict() to the current user to use their information.
