@@ -473,6 +473,30 @@ def user():
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
             if _auth:
+                ## Logic to get params ######################################################
+                ## If query filter present in url params it will save it, else will set False.
+                _query = False if 'filter' not in request.args else request.args.get('filter')
+                ## If id filter present in url params it will save it, else will set false.
+                _id = False if 'id' not in request.args else request.args.get('id')
+                
+                ## Logic to set query ######################################################
+                if _query:
+                    ## calls to splitParams sending the _query form the request. If query correct returns a 
+                    ## dictionary with the params as key value.
+                    _parameters = Helpers.splitParams(_query)
+                    ## if limit param present set the limit value
+                    _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
+                    ## if username param present, set the username param
+                    _username = str(_parameters['username']) if 'username' in _parameters else False
+                    ## if active param present validates the str value, if true seet True, else set False. if not present, 
+                    ## sets _active to "N" to ignore the value
+                    if 'active' in _parameters:
+                        _active = True if str(_parameters['active']).lower() == 'true' else False
+                    else: 
+                        _active = "N"
+                ## Logic to get data
+                
+                ## logic to delete 
                 return "delete"
             else:
                 ## Missing authorization headers.
