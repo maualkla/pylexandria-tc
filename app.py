@@ -474,7 +474,6 @@ def user():
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
             if _auth:
-                print(1)
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
                 _query = False if 'filter' not in request.args else request.args.get('filter')
@@ -482,10 +481,8 @@ def user():
                 _id = False if 'id' not in request.args else request.args.get('id')
                 _username = False
                 _active = "N"
-                print(2)
                 ## Logic to set query ######################################################
                 if _query:
-                    print(2.1)
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
                     ## dictionary with the params as key value.
                     _parameters = Helpers.splitParams(_query)
@@ -498,43 +495,36 @@ def user():
                         
                 ## Logic to get data
                 ## Validate the 4 possible combinations for the query of the users search
-                print(3)
                 if _id:
-                    print(3.1)
                     ## The case of id is present will search for that specific email
                     _search = users_ref.where(filter=FieldFilter("email", "==", _id))
                 elif _username:
-                    print(3.2)
                     ## The case username is present, will search with the specific username. 
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
                 elif _active != "N":
-                    print(3.3)
                     ## In case activate is present, will search for active or inactive users.
                     _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
                 else:
-                    print(3.4)
                     ## In case any param was present, will search all
                     _search = users_ref.where(filter=FieldFilter("email", "==", ""))
                 ## Loop in all the users inside the users_ref object
                 _trx = {}
-                print(4)
                 for _us in _search.stream():
-                    print(4.1)
                     ## apply the to_dict() to the current user to use their information.
                     _acc = _us.to_dict()
-                    print(_acc)
+                    ## validate if deletion was successful
                     if deleteUser(_acc['email'], _acc['username']):
-                        print(4.2)
+                        ## Add the trx number to the user email to the return response
                         _trx[_acc['email']] = trxGenerator(currentDate(), _auth['userId'])
                     else:
-                        print(4.3)
+                        ## Sums error count
                         _errors += 1
-                print(5)
+                ## validated the numer of errors
                 if _errors == 0:
-                    print(5.1)
+                    ## if no errors returns only the trx 
                     return jsonify(_trx), 200
                 else:
-                    print(5.2)
+                    ## if errors, returns the error count and the trx successful
                     return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deletingn", "errorCount": _errors, "transactions": [_trx]}), 401
             else:
                 ## Missing authorization headers.
