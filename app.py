@@ -328,7 +328,7 @@ def user():
                 ## If headers present, call to validateSession to know if it is a valid authorization,
                 _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
                 ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('TokenId'))
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
             else: 
                 _auth = False
             if _auth:
@@ -463,7 +463,17 @@ def user():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         elif request.method == 'DELETE':
-            return "delete"
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                return "delete"
     except Exception as e:
         print (e)
         return jsonify({"status":"Error", "code": "500", "reason": str(e)}), 500
