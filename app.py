@@ -474,9 +474,12 @@ def user():
                 _auth = False
             if _auth:
                 return "delete"
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
         print (e)
-        return jsonify({"status":"Error", "code": "500", "reason": str(e)}), 500
+        return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
 ## Workspace service.
 @app.route('/workspace', methods=['POST','PUT'])
