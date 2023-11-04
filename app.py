@@ -265,7 +265,7 @@ def signup():
         return {"status": "An error Occurred", "error": str(e)}
     
 ## user service
-@app.route('/user', methods=['POST','PUT','GET'])
+@app.route('/user', methods=['POST','PUT','GET','DELETE'])
 def user():
     try:
         ## Method: POST /user
@@ -328,7 +328,7 @@ def user():
                 ## If headers present, call to validateSession to know if it is a valid authorization,
                 _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
                 ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('TokenId'))
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
             else: 
                 _auth = False
             if _auth:
@@ -462,9 +462,76 @@ def user():
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+        elif request.method == 'DELETE':
+            _errors = 0
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                ## Logic to get params ######################################################
+                ## If query filter present in url params it will save it, else will set False.
+                _query = False if 'filter' not in request.args else request.args.get('filter')
+                ## If id filter present in url params it will save it, else will set false.
+                _id = False if 'id' not in request.args else request.args.get('id')
+                _username = False
+                _active = "N"
+                ## Logic to set query ######################################################
+                if _query:
+                    ## calls to splitParams sending the _query form the request. If query correct returns a 
+                    ## dictionary with the params as key value.
+                    _parameters = Helpers.splitParams(_query)
+                    ## if username param present, set the username param
+                    _username = str(_parameters['username']) if 'username' in _parameters else _username
+                    ## if active param present validates the str value, if true seet True, else set False. if not present, 
+                    ## sets _active to "N" to ignore the value
+                    if 'active' in _parameters:
+                        _active = False if str(_parameters['active']).lower() == 'true' else False
+                        
+                ## Logic to get data
+                ## Validate the 4 possible combinations for the query of the users search
+                if _id:
+                    ## The case of id is present will search for that specific email
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                elif _username:
+                    ## The case username is present, will search with the specific username. 
+                    _search = users_ref.where(filter=FieldFilter("username", "==", _username))
+                elif _active != "N":
+                    ## In case activate is present, will search for active or inactive users.
+                    _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
+                else:
+                    ## In case any param was present, will search all
+                    _search = users_ref.where(filter=FieldFilter("email", "==", ""))
+                ## Loop in all the users inside the users_ref object
+                _trx = {}
+                for _us in _search.stream():
+                    ## apply the to_dict() to the current user to use their information.
+                    _acc = _us.to_dict()
+                    ## validate if deletion was successful
+                    if deleteUser(_acc['email'], _acc['username']):
+                        ## Add the trx number to the user email to the return response
+                        _trx[_acc['email']] = trxGenerator(currentDate(), _auth['userId'])
+                    else:
+                        ## Sums error count
+                        _errors += 1
+                ## validated the numer of errors
+                if _errors == 0:
+                    ## if no errors returns only the trx 
+                    return jsonify(_trx), 200
+                else:
+                    ## if errors, returns the error count and the trx successful
+                    return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deletingn", "errorCount": _errors, "transactions": [_trx]}), 401
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
         print (e)
-        return jsonify({"status":"Error", "code": "500", "reason": str(e)}), 500
+        return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
 ## Workspace service.
 @app.route('/workspace', methods=['POST','PUT'])
@@ -646,6 +713,22 @@ def encode():
 ### Private Services  ##################
 ########################################
 
+## User Services
+def deleteUser(_id, _un):
+    try:
+        print(" >> deleteUser() helper.")
+        deleteUserTokens(_id)
+        if users_ref.document(_id).delete():
+            return True
+        else: 
+            return False
+    except Exception as e:
+        print ( "(!) Exception in function: deleteUser() ")
+        print (e)
+        return False
+
+
+
 ## Token Services
 
 ## token generator (POST)
@@ -711,6 +794,10 @@ def deleteUserTokens(_un):
     for _tok in _tokens.stream():
         ## if inside, _exists = true and delete current token
         _exists = True
+        ## Delete sessions related to token
+        _sessions = sess_ref.where(filter=FieldFilter("tokenId", "==", _tok.id))
+        for _ses in _sessions.stream():
+            deleteSession(_ses.id)
         deleteToken(_tok.id)
         _tokens_count += 1
     return _tokens_count
@@ -775,7 +862,7 @@ def validateSession(_id, _tokenid):
         if _sess != None:
             _dicted = _sess.to_dict()
             if _dicted['tokenId'] == _tokenid:
-                return True
+                return _dicted
             else:
                 return False
         else:
