@@ -484,17 +484,29 @@ def user():
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
                     ## dictionary with the params as key value.
                     _parameters = Helpers.splitParams(_query)
-                    ## if limit param present set the limit value
-                    _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if username param present, set the username param
                     _username = str(_parameters['username']) if 'username' in _parameters else False
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
-                        _active = True if str(_parameters['active']).lower() == 'true' else False
+                        _active = False if str(_parameters['active']).lower() == 'true' else False
                     else: 
                         _active = "N"
                 ## Logic to get data
+                ## Validate the 4 possible combinations for the query of the users search
+                if _id:
+                    ## The case of id is present will search for that specific email
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                elif _username:
+                    ## The case username is present, will search with the specific username. 
+                    _search = users_ref.where(filter=FieldFilter("username", "==", _username))
+                elif _active != "N":
+                    ## In case activate is present, will search for active or inactive users.
+                    _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
+                else:
+                    ## In case any param was present, will search all
+                    _search = users_ref
+                ## Loop in all the users inside the users_ref object
                 
                 ## logic to delete 
                 return "delete"
