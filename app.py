@@ -99,8 +99,8 @@ def session():
                             _token = getToken(_sess_params[0])
                             ## Validate if valid token. is present. If not, generates a new token for the user.
                             if _token == False:  
-                                ## calls tokenGenerator sending user name and False. To generate a temporal token.
-                                _token = tokenGenerator(_sess_params[0], False)
+                                ## calls authPost sending user name and False. To generate a temporal token.
+                                _token = authPost(_sess_params[0], False)
                             ## Generate the json object required to create the session object.
                             _session_json = {
                                 "clientIp" : _client['ip'],
@@ -177,7 +177,7 @@ def login():
                     ## delete all existing tokens for the current user.
                     deleteUserTokens(_username)
                     ## generates token with user, send False flag, to get a token valid for 72 hours, True for 180 days
-                    _token = tokenGenerator(_username, False)
+                    _token = authPost(_username, False)
                     ## return _token generated before, a transaction id and a 200 code.
                     return jsonify({"expire": "", "id": _token, "username": "", "trxId": trxGenerator(currentDate(), _username), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
                 else:
@@ -728,15 +728,13 @@ def deleteUser(_id, _un):
         return False
 
 
-
-## Token Services
-
-## token generator (POST)
-## _user: User Email for the Token.
+## Auth POST Service
+## auth (POST)
+## _user: User Email for the Token authorization.
 ## _ilimited: If true will set a timedelta of 180 days, else will be only for 72 hours.
-def tokenGenerator(_user, _ilimited):
+def authPost(_user, _ilimited):
     try:
-        print(" >> tokenGenerator() helper.")
+        print(" >> authPost() service.")
         from datetime import datetime, timedelta
         current_date_time = datetime.now()
         token = idGenerator(10)
@@ -753,9 +751,13 @@ def tokenGenerator(_user, _ilimited):
         if tokens_ref.document(token).set(tobj):
             return token
         else: 
-            return {"status": "Error", "errorStatus": "An error ocurred while creating the token, try again."}
+            _status =  {"status": "Error", "errorStatus": "An error ocurred while creating the token, try again."}
+            print(_status)
+            return False
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: authPost() ")
+        print (e)
+        return False
 
 ## Token validation
 def tokenValidator(_user, _token):
