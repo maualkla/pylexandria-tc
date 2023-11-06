@@ -179,7 +179,7 @@ def login():
                     ## generates token with user, send False flag, to get a token valid for 72 hours, True for 180 days
                     _token = authPost(_username, False)
                     ## return _token generated before, a transaction id and a 200 code.
-                    return jsonify({"expire": "", "id": _token, "username": "", "trxId": trxGenerator(currentDate(), _username), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
+                    return jsonify({"expire": "", "id": _token['id'], "username": "", "trxId": trxGenerator(currentDate(), _username), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
                 else:
                     return jsonify({"status": "Error", "code": "401", "reason": "Not Authorized, review user or password", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 401
             else:
@@ -758,7 +758,7 @@ def authPost(_user, _ilimited):
         }
         ## sends token to be created in firestore, if success returns token info, else prints error and returns False
         if tokens_ref.document(token).set(tobj):
-            return token
+            return tobj
         else: 
             _status =  {"status": "Error", "errorStatus": "An error ocurred while creating the token, try again."}
             print(_status)
