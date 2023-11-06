@@ -798,7 +798,7 @@ def authGet(_user):
             ## Else we return false indicating error.
             return False
     except Exception as e:
-        print ( "(!) Exception in function: authPost() ")
+        print ( "(!) Exception in function: authGet() ")
         print (e)
         return False
     
@@ -817,7 +817,7 @@ def authDelete(_id):
         else: 
             return False
     except Exception as e:
-        print ( "(!) Exception in function: authPost() ")
+        print ( "(!) Exception in function: authDelete() ")
         print (e)
         return False
 
