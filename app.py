@@ -582,12 +582,15 @@ def workspace():
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
-                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), 500
-                        return jsonify({"status": "success", "code": "200", "reason": "Workspace created succesfully.", "trxId": trxGenerator(currentDate(), request.json['Owner'])}), 200
+                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
+                        ## in case the ws is created, returns 200 abd the trxId 
+                        return jsonify({"status": "success", "code": 200, "reason": "Workspace created succesfully.", "trxId": trxGenerator(currentDate(), request.json['Owner'])}), 200
                     else:
-                        return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields"}), 400
+                        ## in case any required field is not present, will return a 400
+                        return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
                 else: 
-                    return jsonify({"status": "Error", "code": "403", "reason": "Workspace TaxId already registered."}), 403
+                    ## In case ws TaxId is already registered, will trwo a 403 error.
+                    return jsonify({"status": "Error", "code": 403, "reason": "Workspace TaxId already registered."}), 403
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
