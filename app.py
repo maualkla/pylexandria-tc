@@ -773,7 +773,7 @@ def authPost(_user, _ilimited):
 ## _user: User Email for the Token authorization.
 def authGet(_user):
     try:
-        print(" >> authGet() helper.")
+        print(" >> authGet() service.")
         ## search in firestore from tokens of currrent user
         _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _user))
         ## Set the tokens count to know how many tokens were processed.
@@ -788,7 +788,7 @@ def authGet(_user):
             _valid = tokenValidator(_user, _token.id)
             ## In case _valid == False or tokens_count > 1 it will delete the token and return false indicating error. 
             if not _valid or _tokens_count > 1:
-                deleteToken(_tok.id)
+                authDelete(_tok.id)
                 return False
         ## If tokens count == 1 we return the id value of the token.
         if _tokens_count > 0:
@@ -819,7 +819,7 @@ def tokenValidator(_user, _token):
                 if new_current_date_time.date() < new_expire_date.date():
                     return True
                 else: 
-                    deleteToken(_token)
+                    authDelete(_token)
                     return False
             except Exception as e:
                 return {"status": "error"}      
@@ -839,18 +839,20 @@ def deleteUserTokens(_un):
     for _tok in _tokens.stream():
         ## if inside, _exists = true and delete current token
         _exists = True
-        ## Delete sessions related to token
-        _sessions = sess_ref.where(filter=FieldFilter("tokenId", "==", _tok.id))
-        for _ses in _sessions.stream():
-            deleteSession(_ses.id)
-        deleteToken(_tok.id)
+        authDelete(_tok.id)
         _tokens_count += 1
     return _tokens_count
 
-## Delete Token
-def deleteToken(_id):
+## Auth DELETE Service
+## auth (DELETE)
+## _id: Token id to be deleted.
+def authDelete(_id):
     try:
-        print(" >> deleteToken() helper.")
+        print(" >> authDelete() service.")
+        ## Delete sessions related to token
+        _sessions = sess_ref.where(filter=FieldFilter("tokenId", "==", _id))
+        for _ses in _sessions.stream():
+            deleteSession(_ses.id)
         if tokens_ref.document(_id).delete():
             return True
         else: 
