@@ -106,7 +106,7 @@ def session():
                                 "clientIp" : _client['ip'],
                                 "clientVersion": _client['browser'],
                                 "id": _idg,
-                                "tokenId": _token,
+                                "tokenId": _token['id'],
                                 "userId": _sess_params[0]
                             }
                             try:
@@ -837,7 +837,8 @@ def authGet(_user):
                 return False
         ## If tokens count == 1 we return the id value of the token.
         if _tokens_count > 0:
-            return _tok.id
+            ## returns token to dictionary
+            return _token.to_dict()
         else:
             ## Else we return false indicating error.
             return False
