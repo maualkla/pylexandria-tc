@@ -709,9 +709,9 @@ def encode():
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
 
-########################################
-### Private Services  ##################
-########################################
+######################################################################
+### Private Services  ################################################
+######################################################################
 
 ## User Services
 def deleteUser(_id, _un):
@@ -767,6 +767,40 @@ def authPost(_user, _ilimited):
         print ( "(!) Exception in function: authPost() ")
         print (e)
         return False
+    
+## Auth GET Service
+## auth (GET)
+## _user: User Email for the Token authorization.
+def authGet(_user):
+    try:
+        print(" >> authGet() helper.")
+        ## search in firestore from tokens of currrent user
+        _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _user))
+        ## Set the tokens count to know how many tokens were processed.
+        _tokens_count = 0
+        ## Iterate the posible tokens for the user.
+        for _tok in _tokens.stream():
+            ## Save the current token object in _token
+            _token = _tok
+            ## sums 1 to the tokens count
+            _tokens_count += 1
+            ## Validate if the token is valid
+            _valid = tokenValidator(_user, _token.id)
+            ## In case _valid == False or tokens_count > 1 it will delete the token and return false indicating error. 
+            if not _valid or _tokens_count > 1:
+                deleteToken(_tok.id)
+                return False
+        ## If tokens count == 1 we return the id value of the token.
+        if _tokens_count > 0:
+            ## returns token to dictionary
+            return _token.to_dict()
+        else:
+            ## Else we return false indicating error.
+            return False
+    except Exception as e:
+        print ( "(!) Exception in function: authPost() ")
+        print (e)
+        return False
 
 ## Token validation
 def tokenValidator(_user, _token):
@@ -812,38 +846,6 @@ def deleteUserTokens(_un):
         deleteToken(_tok.id)
         _tokens_count += 1
     return _tokens_count
-
-## Auth GET Service
-## auth (GET)
-## _user: User Email for the Token authorization.
-def authGet(_user):
-    try:
-        print(" >> authGet() helper.")
-        ## search in firestore from tokens of currrent user
-        _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _user))
-        ## Set the tokens count to know how many tokens were processed.
-        _tokens_count = 0
-        ## Iterate the posible tokens for the user.
-        for _tok in _tokens.stream():
-            ## Save the current token object in _token
-            _token = _tok
-            ## sums 1 to the tokens count
-            _tokens_count += 1
-            ## Validate if the token is valid
-            _valid = tokenValidator(_user, _token.id)
-            ## In case _valid == False or tokens_count > 1 it will delete the token and return false indicating error. 
-            if not _valid or _tokens_count > 1:
-                deleteToken(_tok.id)
-                return False
-        ## If tokens count == 1 we return the id value of the token.
-        if _tokens_count > 0:
-            ## returns token to dictionary
-            return _token.to_dict()
-        else:
-            ## Else we return false indicating error.
-            return False
-    except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
 
 ## Delete Token
 def deleteToken(_id):
