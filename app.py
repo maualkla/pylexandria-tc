@@ -801,6 +801,26 @@ def authGet(_user):
         print ( "(!) Exception in function: authPost() ")
         print (e)
         return False
+    
+## Auth DELETE Service
+## auth (DELETE)
+## _id: Token id to be deleted.
+def authDelete(_id):
+    try:
+        print(" >> authDelete() service.")
+        ## Delete sessions related to token
+        _sessions = sess_ref.where(filter=FieldFilter("tokenId", "==", _id))
+        for _ses in _sessions.stream():
+            deleteSession(_ses.id)
+        if tokens_ref.document(_id).delete():
+            return True
+        else: 
+            return False
+    except Exception as e:
+        print ( "(!) Exception in function: authPost() ")
+        print (e)
+        return False
+
 
 ## Token validation
 def tokenValidator(_user, _token):
@@ -841,25 +861,7 @@ def deleteUserTokens(_un):
         _exists = True
         authDelete(_tok.id)
         _tokens_count += 1
-    return _tokens_count
-
-## Auth DELETE Service
-## auth (DELETE)
-## _id: Token id to be deleted.
-def authDelete(_id):
-    try:
-        print(" >> authDelete() service.")
-        ## Delete sessions related to token
-        _sessions = sess_ref.where(filter=FieldFilter("tokenId", "==", _id))
-        for _ses in _sessions.stream():
-            deleteSession(_ses.id)
-        if tokens_ref.document(_id).delete():
-            return True
-        else: 
-            return False
-    except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
-    
+    return _tokens_count    
 
 ## Session Services ####################
 def deleteSession(_id):
