@@ -96,7 +96,7 @@ def session():
                         ## Validate if the pass is the same in the request as it is in the firebase_object
                         if _requ == _fire:
                             ## Get the user token. In case exist it will retrieve the tokenId. Else return False.
-                            _token = getToken(_sess_params[0])
+                            _token = authGet(_sess_params[0])
                             ## Validate if valid token. is present. If not, generates a new token for the user.
                             if _token == False:  
                                 ## calls authPost sending user name and False. To generate a temporal token.
@@ -106,7 +106,7 @@ def session():
                                 "clientIp" : _client['ip'],
                                 "clientVersion": _client['browser'],
                                 "id": _idg,
-                                "tokenId": _token,
+                                "tokenId": _token['id'],
                                 "userId": _sess_params[0]
                             }
                             try:
@@ -709,9 +709,9 @@ def encode():
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
 
-########################################
-### Private Services  ##################
-########################################
+######################################################################
+### Private Services  ################################################
+######################################################################
 
 ## User Services
 def deleteUser(_id, _un):
@@ -735,24 +735,67 @@ def deleteUser(_id, _un):
 def authPost(_user, _ilimited):
     try:
         print(" >> authPost() service.")
+        ## import datetime library
         from datetime import datetime, timedelta
+        ## get current time
         current_date_time = datetime.now()
+        ## generates string for the token
         token = idGenerator(10)
+        ## validates if _limited param present
         if _ilimited:
+            ## if ilimited set token expiracy for 180days
             new_date_time = current_date_time + timedelta(days=180)
         else:
+            ## if ilimited token not present, expiracy set for 3 days
             new_date_time = current_date_time + timedelta(hours=72)
+        ## get current date time format.
         new_date_time = new_date_time.strftime("%d%m%YH%M%S")
+        ## generate the json to create the token in firestore
         tobj = {
             "id" : token,
             "expire" : new_date_time,
             "username": _user
         }
+        ## sends token to be created in firestore, if success returns token info, else prints error and returns False
         if tokens_ref.document(token).set(tobj):
             return token
         else: 
             _status =  {"status": "Error", "errorStatus": "An error ocurred while creating the token, try again."}
             print(_status)
+            return False
+    except Exception as e:
+        print ( "(!) Exception in function: authPost() ")
+        print (e)
+        return False
+    
+## Auth GET Service
+## auth (GET)
+## _user: User Email for the Token authorization.
+def authGet(_user):
+    try:
+        print(" >> authGet() helper.")
+        ## search in firestore from tokens of currrent user
+        _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _user))
+        ## Set the tokens count to know how many tokens were processed.
+        _tokens_count = 0
+        ## Iterate the posible tokens for the user.
+        for _tok in _tokens.stream():
+            ## Save the current token object in _token
+            _token = _tok
+            ## sums 1 to the tokens count
+            _tokens_count += 1
+            ## Validate if the token is valid
+            _valid = tokenValidator(_user, _token.id)
+            ## In case _valid == False or tokens_count > 1 it will delete the token and return false indicating error. 
+            if not _valid or _tokens_count > 1:
+                deleteToken(_tok.id)
+                return False
+        ## If tokens count == 1 we return the id value of the token.
+        if _tokens_count > 0:
+            ## returns token to dictionary
+            return _token.to_dict()
+        else:
+            ## Else we return false indicating error.
             return False
     except Exception as e:
         print ( "(!) Exception in function: authPost() ")
@@ -803,35 +846,6 @@ def deleteUserTokens(_un):
         deleteToken(_tok.id)
         _tokens_count += 1
     return _tokens_count
-
-## Get UserToken
-def getToken(_un):
-    try:
-        print(" >> getToken() helper.")
-        ## search in firestore from tokens of currrent user
-        _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _un))
-        ## Set the tokens count to know how many tokens were processed.
-        _tokens_count = 0
-        ## Iterate the posible tokens for the user.
-        for _tok in _tokens.stream():
-            ## Save the current token object in _token
-            _token = _tok
-            ## sums 1 to the tokens count
-            _tokens_count += 1
-            ## Validate if the token is valid
-            _valid = tokenValidator(_un, _token.id)
-            ## In case _valid == False or tokens_count > 1 it will delete the token and return false indicating error. 
-            if not _valid or _tokens_count > 1:
-                deleteToken(_tok.id)
-                return False
-        ## If tokens count == 1 we return the id value of the token.
-        if _tokens_count > 0:
-            return _tok.id
-        else:
-            ## Else we return false indicating error.
-            return False
-    except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
 
 ## Delete Token
 def deleteToken(_id):
