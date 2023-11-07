@@ -148,7 +148,7 @@ def session():
             return jsonify({"status": "Error", "code": 405, "reason": "Method Not Allowed"}), 405
     except Exception as e: 
         ## In case of error.
-        return {"status":"Error", "code": 500, "reason": str(e)}
+        return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
 ## Login service (deprecated)
 @app.route("/login", methods=['GET'])
@@ -185,7 +185,7 @@ def login():
             else:
                 return jsonify({"status": "Error", "code": "404", "reason": "Not Authorized, review user or password", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 404
     except Exception as e: 
-        return {"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
+        return jsonify({"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 500
 
 ## Logout Service
 @app.route('/logout', methods=['GET'])
@@ -208,7 +208,7 @@ def logout():
             else:
                 return jsonify({"status": "error", "code": "404", "reason": "User not logged.", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 404
     except Exception as e: 
-        return {"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
+        return jsonify({"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 500
 
 ## Sign up service
 @app.route('/signup', methods=['POST'])
@@ -675,6 +675,10 @@ def workspace():
                 ## set default value for limit and count. 
                 _limit =  10 
                 _count = 0
+                _owner = False
+                _shortCode = False
+                _active = "N"
+
                 ## Validate if _query present
                 if _query:
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
@@ -683,15 +687,13 @@ def workspace():
                     ## if limit param present set the limit value
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if username param present, set the owner param
-                    _owner = str(_parameters['owner']) if 'owner' in _parameters else False
+                    _owner = str(_parameters['owner']) if 'owner' in _parameters else _owner
                     ## if shortCode param present, set the shortCode param
-                    _shortCode = str(_parameters['shortCode']) if 'shortCode' in _parameters else False
+                    _shortCode = str(_parameters['shortCode']) if 'shortCode' in _parameters else _shortCode
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
                         _active = True if str(_parameters['active']).lower() == 'true' else False
-                    else: 
-                        _active = "N"
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
@@ -713,11 +715,11 @@ def workspace():
                     ## In case any param was present, will search all
                     _search = wsp_ref
                 ## Loop in all the users inside the users_ref object
-                for _us in _search.stream():
+                for _ws in _search.stream():
                     ## set the temporal json_blocl
                     _json_block_l = {}
                     ## apply the to_dict() to the current user to use their information.
-                    _acc = _us.to_dict()
+                    _acc = _ws.to_dict()
                     ## Add a +1 to the count
                     _count += 1
                     ## Iterates into the _user_fields object to generate the json object for that user.
@@ -738,7 +740,7 @@ def workspace():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
-        return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), int(str(e)[0:3])
+        return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
 
 ## Transactions service.
 @app.route('/transaction', methods=['GET'])
