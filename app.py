@@ -653,7 +653,7 @@ def workspace():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
-        return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
+        return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), int(str(e)[0:3])
 
 ## Transactions service.
 @app.route('/transaction', methods=['GET'])
