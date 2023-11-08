@@ -534,7 +534,7 @@ def user():
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
 ## Workspace service.
-@app.route('/workspace', methods=['POST','PUT','GET'])
+@app.route('/workspace', methods=['POST','PUT','GET','DELETE'])
 def workspace():
     try:
         ## Method: POST /workspace
@@ -558,7 +558,7 @@ def workspace():
                 ## If the wsp with that taxId do not exists proceeeds, otherwise return a 403 http code.
                 if _wsp_exist == None:
                     ## Validate required values, first creating a list of all required
-                    req_fields = ['Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
+                    req_fields = ['Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'CreationDate', 'PostalCode']
                     ## go and iterate to find all of them, if not _go will be false
                     _go = True
                     ## For Loop going for all the required fields.
@@ -575,6 +575,7 @@ def workspace():
                         for req_value in req_fields:
                             ## update _json_payload object adding current field.
                             _json_payload.update({req_value: request.json[req_value]})
+                        _json_payload.update({"Active": True})
                         # create workspace.
                         try:
                             ## Call to create the workspace.
@@ -697,20 +698,20 @@ def workspace():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("email", "==", _id))
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
                 elif _shortCode: 
                     ## the case of shortCode is present wull search for it.
-                    _search = wsp_ref.where(filter=FieldFilter("shortCode", "==", _shortCode))
+                    _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
                 elif _owner:
                     ## The case username is present, will search with the specific username. 
-                    _search = wsp_ref.where(filter=FieldFilter("owner", "==", _owner))
+                    _search = wsp_ref.where(filter=FieldFilter("Owner", "==", _owner))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
-                        _search = _search.where(filter=FieldFilter("activate", "==", _active))
+                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
-                    _search = wsp_ref.where(filter=FieldFilter("activate", "==", _active))
+                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _active))
                 else:
                     ## In case any param was present, will search all
                     _search = wsp_ref
@@ -736,6 +737,88 @@ def workspace():
                 _json_data_block["containsData"] = True if _count > 0 else False 
                 _json_data_block["query"] = _query
                 return jsonify(_json_data_block), 200
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+        ## Method: DELETE /workspace
+        elif request.method == 'DELETE':
+            print(1)
+            _errors = 0
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                ## Logic to get params ######################################################
+                ## If query filter present in url params it will save it, else will set False.
+                _query = False if 'filter' not in request.args else request.args.get('filter')
+                ## If id filter present in url params it will save it, else will set false.
+                _id = False if 'id' not in request.args else request.args.get('id')
+                _owner = False
+                _shortCode = False
+                _active = "N"
+
+                ## Validate if _query present
+                if _query:
+                    ## calls to splitParams sending the _query form the request. If query correct returns a 
+                    ## dictionary with the params as key value.
+                    _parameters = Helpers.splitParams(_query)
+                    ## if username param present, set the owner param
+                    _owner = str(_parameters['owner']) if 'owner' in _parameters else _owner
+                    ## if shortCode param present, set the shortCode param
+                    _shortCode = str(_parameters['shortCode']) if 'shortCode' in _parameters else _shortCode
+                    ## if active param present validates the str value, if true seet True, else set False. if not present, 
+                    ## sets _active to "N" to ignore the value
+                    if 'active' in _parameters:
+                        _active = True if str(_parameters['active']).lower() == 'true' else False
+                        
+                ## Logic to get data
+                ## Validate the 4 possible combinations for the query of the users search
+                if _id:
+                    ## The case of id is present will search for that specific email
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                elif _shortCode: 
+                    ## the case of shortCode is present wull search for it.
+                    _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
+                    if _active != "N":
+                        ## In case the _active param is present in valid fashion, will search for active or inactiv
+                        ## e users.
+                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                elif _owner:
+                    ## The case username is present, will search with the specific username. 
+                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _owner))
+                    if _active != "N":
+                        ## In case the _active param is present in valid fashion, will search for active or inactiv
+                        ## e users.
+                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                else:
+                    ## In case any param was present, will search all
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", ""))
+
+                ## Loop in all the users inside the users_ref object
+                _trx = {}
+                for _us in _search.stream():
+                    ## apply the to_dict() to the current user to use their information.
+                    _acc = _us.to_dict()
+                    ## validate if deletion was successful
+                    if deleteWorkspace(_acc['TaxId']):
+                        ## Add the trx number to the user email to the return response
+                        _trx[_acc['TaxId']] = trxGenerator(currentDate(), _auth['userId'])
+                    else:
+                        ## Sums error count
+                        _errors += 1
+                ## validated the numer of errors
+                if _errors == 0:
+                    ## if no errors returns only the trx 
+                    return jsonify(_trx), 200
+                else:
+                    ## if errors, returns the error count and the trx successful
+                    return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deleting", "errorCount": _errors, "transactions": [_trx]}), 401
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
@@ -849,6 +932,18 @@ def deleteUser(_id, _un):
         print (e)
         return False
 
+## Workspace Services
+def deleteWorkspace(_id):
+    try:
+        print(" >> deleteWorkspace() helper.")
+        if wsp_ref.document(_id).delete():
+            return True
+        else: 
+            return False
+    except Exception as e:
+        print ( "(!) Exception in function: deleteUser() ")
+        print (e)
+        return False
 
 ## Auth POST Service
 ## auth (POST)
