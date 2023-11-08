@@ -818,7 +818,7 @@ def workspace():
                     return jsonify(_trx), 200
                 else:
                     ## if errors, returns the error count and the trx successful
-                    return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deletingn", "errorCount": _errors, "transactions": [_trx]}), 401
+                    return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deleting", "errorCount": _errors, "transactions": [_trx]}), 401
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
