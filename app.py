@@ -697,20 +697,20 @@ def workspace():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("email", "==", _id))
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
                 elif _shortCode: 
                     ## the case of shortCode is present wull search for it.
-                    _search = wsp_ref.where(filter=FieldFilter("shortCode", "==", _shortCode))
+                    _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
                 elif _owner:
                     ## The case username is present, will search with the specific username. 
-                    _search = wsp_ref.where(filter=FieldFilter("owner", "==", _owner))
+                    _search = wsp_ref.where(filter=FieldFilter("Owner", "==", _owner))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
-                        _search = _search.where(filter=FieldFilter("activate", "==", _active))
+                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
-                    _search = wsp_ref.where(filter=FieldFilter("activate", "==", _active))
+                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _active))
                 else:
                     ## In case any param was present, will search all
                     _search = wsp_ref
@@ -741,17 +741,21 @@ def workspace():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
+            print(1)
             _errors = 0
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                print(1.2)
                 ## In case are present, call validate session. True if valid, else not valid. Fixed to true
                 _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
                 ## If validateSession return false, delete the session id.
                 if _auth == False: deleteSession(request.headers.get('SessionId'))
             else: 
+                print(1.3)
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
             if _auth:
+                print(2)
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
                 _query = False if 'filter' not in request.args else request.args.get('filter')
@@ -763,11 +767,10 @@ def workspace():
 
                 ## Validate if _query present
                 if _query:
+                    print(2.1)
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
                     ## dictionary with the params as key value.
                     _parameters = Helpers.splitParams(_query)
-                    ## if limit param present set the limit value
-                    _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if username param present, set the owner param
                     _owner = str(_parameters['owner']) if 'owner' in _parameters else _owner
                     ## if shortCode param present, set the shortCode param
@@ -780,39 +783,46 @@ def workspace():
                 ## Logic to get data
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
+                    print(3)
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("email", "==", _id))
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
                 elif _shortCode: 
+                    print(4)
                     ## the case of shortCode is present wull search for it.
-                    _search = wsp_ref.where(filter=FieldFilter("shortCode", "==", _shortCode))
+                    _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
                 elif _owner:
+                    print(5)
                     ## The case username is present, will search with the specific username. 
-                    _search = wsp_ref.where(filter=FieldFilter("owner", "==", _owner))
+                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _owner))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
-                        _search = _search.where(filter=FieldFilter("activate", "==", _active))
+                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
                 else:
+                    print(6)
                     ## In case any param was present, will search all
-                    _search = wsp_ref
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", ""))
 
                 ## Loop in all the users inside the users_ref object
                 _trx = {}
                 for _us in _search.stream():
+                    print(7)
                     ## apply the to_dict() to the current user to use their information.
                     _acc = _us.to_dict()
                     ## validate if deletion was successful
-                    if deleteWorkspace(_acc['email']):
+                    if deleteWorkspace(_acc['TaxId']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['email']] = trxGenerator(currentDate(), _auth['userId'])
+                        _trx[_acc['TaxId']] = trxGenerator(currentDate(), _auth['userId'])
                     else:
                         ## Sums error count
                         _errors += 1
                 ## validated the numer of errors
                 if _errors == 0:
+                    print(8)
                     ## if no errors returns only the trx 
                     return jsonify(_trx), 200
                 else:
+                    print(9)
                     ## if errors, returns the error count and the trx successful
                     return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deletingn", "errorCount": _errors, "transactions": [_trx]}), 401
             else:
