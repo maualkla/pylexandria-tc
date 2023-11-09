@@ -842,15 +842,52 @@ def transaction():
             _auth = False
         if _auth:
             ## list all the values to be returned in the get object.
-            _trx_fields = ['date','id','user'] 
+            _trx_fields = ['dateTime','id','userId','alert','action','severity'] 
             ### Set the base for the json block to be returned. Define the data index for the list of trxs
             _json_data_block = {"items": []}
             ## Define _limit, _count, containsData and query
-            _query = ""
-            _limit = 10 if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
+            _## If query filter present in url params it will save it, else will set False.
+            _query = False if 'filter' not in request.args else request.args.get('filter')
+            ## If id filter present in url params it will save it, else will set false.
+            _id = False if 'id' not in request.args else request.args.get('id')
+            ## set default value for limit and count. 
+            _limit =  10 
             _count = 0
+            _action = False
+            _alert = "N"
+            _userId = False
+            ## Validate if _query present
+            if _query:
+                ## calls to splitParams sending the _query form the request. If query correct returns a 
+                ## dictionary with the params as key value.
+                _parameters = Helpers.splitParams(_query)
+                ## if limit param present set the limit value
+                _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
+                ## if username param present, set the owner param
+                _action = str(_parameters['action']) if 'action' in _parameters else _action
+                ## if shortCode param present, set the shortCode param
+                _userId = str(_parameters['userId']) if 'userId' in _parameters else _userId
+                if 'alert' in _parameters:
+                    _alert = True if str(_parameters['alert']).lower() == 'true' else False
+
+            ## Validate the 4 possible combinations for the query of the users search
+            if _id:
+                ## The case of id is present will search for that specific email
+                _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
+            elif _action: 
+                ## the case of shortCode is present wull search for it.
+                _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
+            elif _alert != "N":
+                ## The case username is present, will search with the specific username. 
+                _search = trx_ref.where(filter=FieldFilter("alert", "==", _alert))
+            elif _userId:
+                ## In case activate is present, will search for active or inactive users.
+                _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
+            else:
+                ## In case any param was present, will search all
+                _search = trx_ref
             ## Loop in all the trxs inside the trx_ref object
-            for _trx in trx_ref.stream():
+            for _trx in _search.stream():
                 ## set the temporal json_blocl
                 _json_block_l = {}
                 ## apply the to_dict() to the current trx to use their information.
