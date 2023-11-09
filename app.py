@@ -117,7 +117,7 @@ def session():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Session object failed to be created."}), 500
                             ## In case session was created successflly returns trx code and session id
-                            return jsonify({"_session_id": _idg, "trxId": trxGenerator(currentDate(), _sess_params[0])}), 200
+                            return jsonify({"_session_id": _idg, "trxId": transactionPost(_sess_params[0], False, 1, "Session Post")}), 200
                         else:
                             ## in case passwords do not match
                             return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
@@ -179,7 +179,7 @@ def login():
                     ## generates token with user, send False flag, to get a token valid for 72 hours, True for 180 days
                     _token = authPost(_username, False)
                     ## return _token generated before, a transaction id and a 200 code.
-                    return jsonify({"expire": "", "id": _token['id'], "username": "", "trxId": trxGenerator(currentDate(), _username), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
+                    return jsonify({"expire": "", "id": _token['id'], "username": "", "trxId": transactionPost(_username, False, 1, "Login (deprecated)"), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
                 else:
                     return jsonify({"status": "Error", "code": "401", "reason": "Not Authorized, review user or password", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 401
             else:
@@ -201,7 +201,7 @@ def logout():
             _username = b64Decode(_username)
             ## Delete all user related tokens.
             _tokens = deleteUserTokens(_username)
-            trxGenerator(currentDate(), _username)
+            transactionPost(_username, False, 1, "Logout (deprecated)")
             ## Return 440 logout http response code.
             if _tokens > 0:
                 return jsonify({"status": "success", "code": "440", "reason": "session closed", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 440
@@ -254,7 +254,7 @@ def signup():
                 _tempdate = str(currentDate())
                 ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                 if users_ref.document(s_email).set(objpay):
-                    return jsonify({"trxId": trxGenerator(_tempdate,s_email), "alert": "this service is deprecated and will be removed by v0.03 - Use the /user service instead."}), 202
+                    return jsonify({"trxId": transactionPost(s_email, False, 1, "Signup (deprecated)"), "alert": "this service is deprecated and will be removed by v0.03 - Use the /user service instead."}), 202
                 else:
                     return jsonify({"status": "Error while creating user. ", "alert": "this service is deprecated and will be removed by v0.03 - Use the /user service instead."}), 500
             else:
@@ -308,7 +308,7 @@ def user():
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
-                            return jsonify({"trxId": trxGenerator(str(currentDate()),s_email)}), 202
+                            return jsonify({"trxId": transactionPost(s_email, False, 1, "User Post")}), 202
                         else:
                             ## The user wasnt created and the service returned a error.
                             return jsonify({"status": "Error", "code": 500, "reason": "Error while creating user. "}), 500
@@ -372,7 +372,7 @@ def user():
                             print('(!) >> Handled external service exception: ' + str(e) )
                             return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), 500
                         ## Generate a transaction record.
-                        _trxId = trxGenerator(currentDate(), request.json['email'])
+                        _trxId = transactionPost(request.json['email'], False, 1, "User Put")
                         ## In case all went smooth, return a successful message.
                         return jsonify({"status": "success", "code": "202", "reason": "User information updated successfully.", "trxId": _trxId}), 202
                     else: 
@@ -462,6 +462,7 @@ def user():
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+        ## user Delete service
         elif request.method == 'DELETE':
             _errors = 0
             ## Validate the required authentication headers are present
@@ -515,7 +516,7 @@ def user():
                     ## validate if deletion was successful
                     if deleteUser(_acc['email'], _acc['username']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['email']] = trxGenerator(currentDate(), _auth['userId'])
+                        _trx[_acc['email']] = transactionPost(_auth['userId'], False, 1, "User Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -585,7 +586,7 @@ def workspace():
                             print('(!) >> Handled external service exception: ' + str(e) )
                             return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                         ## in case the ws is created, returns 200 abd the trxId 
-                        return jsonify({"status": "success", "code": 200, "reason": "Workspace created succesfully.", "trxId": trxGenerator(currentDate(), request.json['Owner'])}), 200
+                        return jsonify({"status": "success", "code": 200, "reason": "Workspace created succesfully.", "trxId": transactionPost(request.json['Owner'],False, 1, "Workspace POST")}), 200
                     else:
                         ## in case any required field is not present, will return a 400
                         return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
@@ -640,7 +641,7 @@ def workspace():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                             ## in case the ws is created, returns 200 abd the trxId 
-                            return jsonify({"status": "success", "code": 202, "reason": "Workspace updated succesfully.", "trxId": trxGenerator(currentDate(), request.json['Owner'])}), 202
+                            return jsonify({"status": "success", "code": 202, "reason": "Workspace updated succesfully.", "trxId": transactionPost(request.json['Owner'], False, 1, "Workspace Put")}), 202
                         else:
                             ## in case any required field is not present, will return a 400
                             return jsonify({"status": "Error", "code": 400, "reason": "No fields to be updated, review the request."}), 400
@@ -808,7 +809,7 @@ def workspace():
                     ## validate if deletion was successful
                     if deleteWorkspace(_acc['TaxId']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['TaxId']] = trxGenerator(currentDate(), _auth['userId'])
+                        _trx[_acc['TaxId']] = transactionPost(_auth['userId'], False, 1, "Workspace Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -1111,6 +1112,7 @@ def deleteSession(_id):
 ## _token: (required) token id vant to match.
 def validateSession(_id, _tokenid):
     try:
+        print(" >> validateSession() helper.")
         _sess = sess_ref.document(_id).get()        
         if _sess != None:
             _dicted = _sess.to_dict()
@@ -1126,37 +1128,35 @@ def validateSession(_id, _tokenid):
         return False
 
 
-
+## Transaction POST (not public) Service
 ## Transaction Number Generator (legacy)
-def trxGenerator(_date, _user):
+## _userId: For the user id that will be linked to the trx
+## _alert: if it is necesary to generate an alert for this transaction action.
+## _severity: It is the severity of the action. 0 less severe, 5 maximum severity.
+## _action: The name of the action that is generated the transaction for.
+def transactionPost(_userId, _alert, _severity, _action):
     try:
-        print(" >> trxGenerator() helper.")
+        print(" >> transactionPost() helper.")
         from datetime import datetime
         _now = datetime.now()
         _dateGen = _now.strftime("%d%m%YH%M%S")
-        _trxId = randomString(2) + _dateGen + randomString(20)
+        _trxId = randomString(4) + _dateGen + randomString(20)
         _trx_obj = {
-            "dateTime" : _date,
-            "userId" : _user,
+            "dateTime" : _dateGen,
+            "userId" : _userId,
             "id": _trxId,
-            "alert": False,
-            "severity": False,
-            "action": False
+            "alert": _alert if _alert else False,
+            "severity": _severity if _severity else 0,
+            "action": _action if _action else "Unclassified"
         }
-        ### Por el momento no crearemos la trx por que antes necesitamos helpers para:
-        ## - Eliminar trx por usuario.
-        ## - eliminar trx por fecha
-        ## - eliminar todas las transacciones.
-        ## @TODO
-        """
         if trx_ref.document(_trxId).set(_trx_obj):
             return _trxId
         else: 
             return False
-        """
-        return _trxId
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: transactionPost() ")
+        print (e)
+        return False
 
 ########################################
 ### Helpers ############################
