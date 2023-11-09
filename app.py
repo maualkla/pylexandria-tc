@@ -841,7 +841,6 @@ def transaction():
             ## Fixed to true to allow outside calls to log in to the system,
             _auth = False
         if _auth:
-            print(1)
             ## list all the values to be returned in the get object.
             _trx_fields = ['dateTime','id','userId','alert','action','severity'] 
             ### Set the base for the json block to be returned. Define the data index for the list of trxs
@@ -857,14 +856,11 @@ def transaction():
             _action = False
             _alert = "N"
             _userId = False
-            print(2)
             ## Validate if _query present
             if _query:
-                print(2.5)
                 ## calls to splitParams sending the _query form the request. If query correct returns a 
                 ## dictionary with the params as key value.
                 _parameters = Helpers.splitParams(_query)
-                print(_parameters)
                 ## if limit param present set the limit value
                 _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                 ## if username param present, set the owner param
@@ -876,28 +872,22 @@ def transaction():
 
             ## Validate the 4 possible combinations for the query of the users search
             if _id:
-                print(3)
                 ## The case of id is present will search for that specific email
                 _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
             elif _action: 
-                print(4)
                 ## the case of shortCode is present wull search for it.
                 _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
             elif _alert != "N":
-                print(5)
                 ## The case username is present, will search with the specific username. 
                 _search = trx_ref.where(filter=FieldFilter("alert", "==", _alert))
             elif _userId:
-                print(6)
                 ## In case activate is present, will search for active or inactive users.
                 _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
             else:
-                print(7)
                 ## In case any param was present, will search all
                 _search = trx_ref
             ## Loop in all the trxs inside the trx_ref object
             for _trx in _search.stream():
-                print("8_"+str(_count))
                 ## set the temporal json_blocl
                 _json_block_l = {}
                 ## apply the to_dict() to the current trx to use their information.
@@ -908,13 +898,10 @@ def transaction():
                 for _x in _trx_fields:
                     ## Generates the json object.
                     _json_block_l[_x] = _acc[_x]
-                    print(_x)
-                    print(_acc[_x])
                 ## Each iteration, append the trx block to the main payload.
                 _json_data_block["items"].append(_json_block_l)
                 if _count+1 > _limit: break
             ## Before return a response, adding parameters for the get.
-            print(9)
             _json_data_block["limit"] = _limit
             _json_data_block["count"] = _count
             ## In case count > 0 it returns True, else False.
@@ -922,11 +909,9 @@ def transaction():
             _json_data_block["query"] = _query
             return jsonify(_json_data_block), 200
         else:
-            print(10)
             ## Missing authorization headers.
             return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
-        print(11)
         return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
 
 ## (deprecated) v0.01 Auth a token.
