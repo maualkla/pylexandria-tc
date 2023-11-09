@@ -516,7 +516,7 @@ def user():
                     ## validate if deletion was successful
                     if deleteUser(_acc['email'], _acc['username']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['email']] = transactionPost(_auth['userId'], False, 1, "User Delete")
+                        _trx[_acc['email']] = transactionPost(_auth['userId'], False, 2, "User Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -743,7 +743,6 @@ def workspace():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
-            print(1)
             _errors = 0
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
@@ -809,7 +808,7 @@ def workspace():
                     ## validate if deletion was successful
                     if deleteWorkspace(_acc['TaxId']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['TaxId']] = transactionPost(_auth['userId'], False, 1, "Workspace Delete")
+                        _trx[_acc['TaxId']] = transactionPost(_auth['userId'], False, 2, "Workspace Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -832,36 +831,86 @@ def workspace():
 @app.route('/transaction', methods=['GET'])
 def transaction():
     try:
-        ## list all the values to be returned in the get object.
-        _trx_fields = ['date','id','user'] 
-        ### Set the base for the json block to be returned. Define the data index for the list of trxs
-        _json_data_block = {"items": []}
-        ## Define _limit, _count, containsData and query
-        _query = ""
-        _limit = 10 if 'limit' not in request.args else int(request.args.get('limit')) if int(request.args.get('limit')) < 1001 and int(request.args.get('limit')) > 0 else 10
-        _count = 0
-        ## Loop in all the trxs inside the trx_ref object
-        for _trx in trx_ref.stream():
-            ## set the temporal json_blocl
-            _json_block_l = {}
-            ## apply the to_dict() to the current trx to use their information.
-            _acc = _trx.to_dict()
-            ## Add a +1 to the count
-            _count += 1
-            ## Iterates into the _trx_fields object to generate the json object for that user.
-            for _x in _trx_fields:
-                ## Generates the json object.
-                _json_block_l[_x] = _acc[_x]
-            ## Each iteration, append the trx block to the main payload.
-            _json_data_block["items"].append(_json_block_l)
-            if _count+1 > _limit: break
-        ## Before return a response, adding parameters for the get.
-        _json_data_block["limit"] = _limit
-        _json_data_block["count"] = _count
-        ## In case count > 0 it returns True, else False.
-        _json_data_block["containsData"] = True if _count > 0 else False 
-        _json_data_block["query"] = _query
-        return jsonify(_json_data_block), 200
+        ## Validate the required authentication headers are present
+        if request.headers.get('SessionId') and request.headers.get('TokenId'):
+            ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+            _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+            ## If validateSession return false, delete the session id.
+            if _auth == False: deleteSession(request.headers.get('SessionId'))
+        else: 
+            ## Fixed to true to allow outside calls to log in to the system,
+            _auth = False
+        if _auth:
+            ## list all the values to be returned in the get object.
+            _trx_fields = ['dateTime','id','userId','alert','action','severity'] 
+            ### Set the base for the json block to be returned. Define the data index for the list of trxs
+            _json_data_block = {"items": []}
+            ## Define _limit, _count, containsData and query
+            ## If query filter present in url params it will save it, else will set False.
+            _query = False if 'filter' not in request.args else request.args.get('filter')
+            ## If id filter present in url params it will save it, else will set false.
+            _id = False if 'id' not in request.args else request.args.get('id')
+            ## set default value for limit and count. 
+            _limit =  10 
+            _count = 0
+            _action = False
+            _alert = "N"
+            _userId = False
+            ## Validate if _query present
+            if _query:
+                ## calls to splitParams sending the _query form the request. If query correct returns a 
+                ## dictionary with the params as key value.
+                _parameters = Helpers.splitParams(_query)
+                ## if limit param present set the limit value
+                _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
+                ## if username param present, set the owner param
+                _action = str(_parameters['action']) if 'action' in _parameters else _action
+                ## if shortCode param present, set the shortCode param
+                _userId = str(_parameters['userId']) if 'userId' in _parameters else _userId
+                if 'alert' in _parameters:
+                    _alert = True if str(_parameters['alert']).lower() == 'true' else False
+
+            ## Validate the 4 possible combinations for the query of the users search
+            if _id:
+                ## The case of id is present will search for that specific email
+                _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
+            elif _action: 
+                ## the case of shortCode is present wull search for it.
+                _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
+            elif _alert != "N":
+                ## The case username is present, will search with the specific username. 
+                _search = trx_ref.where(filter=FieldFilter("alert", "==", _alert))
+            elif _userId:
+                ## In case activate is present, will search for active or inactive users.
+                _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
+            else:
+                ## In case any param was present, will search all
+                _search = trx_ref
+            ## Loop in all the trxs inside the trx_ref object
+            for _trx in _search.stream():
+                ## set the temporal json_blocl
+                _json_block_l = {}
+                ## apply the to_dict() to the current trx to use their information.
+                _acc = _trx.to_dict()
+                ## Add a +1 to the count
+                _count += 1
+                ## Iterates into the _trx_fields object to generate the json object for that user.
+                for _x in _trx_fields:
+                    ## Generates the json object.
+                    _json_block_l[_x] = _acc[_x]
+                ## Each iteration, append the trx block to the main payload.
+                _json_data_block["items"].append(_json_block_l)
+                if _count+1 > _limit: break
+            ## Before return a response, adding parameters for the get.
+            _json_data_block["limit"] = _limit
+            _json_data_block["count"] = _count
+            ## In case count > 0 it returns True, else False.
+            _json_data_block["containsData"] = True if _count > 0 else False 
+            _json_data_block["query"] = _query
+            return jsonify(_json_data_block), 200
+        else:
+            ## Missing authorization headers.
+            return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
         return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
 
@@ -1170,7 +1219,9 @@ def randomString(_length):
         output_str = ''.join(random.choice(string.ascii_letters) for i in range(_length))
         return output_str
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: randomString() ")
+        print (e)
+        return False
 
 ## return userId
 def idGenerator(_length):
@@ -1180,7 +1231,9 @@ def idGenerator(_length):
         userId = randomString(2) + userId + randomString(_length)
         return userId
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: idGenerator() ")
+        print (e)
+        return False
 
 ## Encrypt
 def encrypt(_string):
@@ -1192,7 +1245,9 @@ def encrypt(_string):
         hashed_pwd = bcrypt.hashpw(bytes_pwd, salt)
         return hashed_pwd
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: encrypt() ")
+        print (e)
+        return False
 
 ## Decrypt
 def decrypt(_string):
@@ -1207,7 +1262,9 @@ def b64Encode(_string):
         _r_out = str(_out, "utf-8")
         return _r_out
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: b64Encode() ")
+        print (e)
+        return False
 
 ## Base64 decode
 def b64Decode(_string):
@@ -1216,7 +1273,9 @@ def b64Decode(_string):
         _out = base64.b64decode(_string).decode('utf-8')
         return _out
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: b64Decode() ")
+        print (e)
+        return False
 
 ## Current date: 
 def currentDate():
@@ -1227,7 +1286,9 @@ def currentDate():
         _now = _now.strftime("%d%m%YH%M%S")
         return _now
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: currrentDate() ")
+        print (e)
+        return False
 
 
 if __name__ == '__main__':
