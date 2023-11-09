@@ -516,7 +516,7 @@ def user():
                     ## validate if deletion was successful
                     if deleteUser(_acc['email'], _acc['username']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['email']] = transactionPost(_auth['userId'], False, 1, "User Delete")
+                        _trx[_acc['email']] = transactionPost(_auth['userId'], False, 2, "User Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -808,7 +808,7 @@ def workspace():
                     ## validate if deletion was successful
                     if deleteWorkspace(_acc['TaxId']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['TaxId']] = transactionPost(_auth['userId'], False, 1, "Workspace Delete")
+                        _trx[_acc['TaxId']] = transactionPost(_auth['userId'], False, 2, "Workspace Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -1234,7 +1234,9 @@ def randomString(_length):
         output_str = ''.join(random.choice(string.ascii_letters) for i in range(_length))
         return output_str
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: randomString() ")
+        print (e)
+        return False
 
 ## return userId
 def idGenerator(_length):
@@ -1244,7 +1246,9 @@ def idGenerator(_length):
         userId = randomString(2) + userId + randomString(_length)
         return userId
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: idGenerator() ")
+        print (e)
+        return False
 
 ## Encrypt
 def encrypt(_string):
@@ -1256,7 +1260,9 @@ def encrypt(_string):
         hashed_pwd = bcrypt.hashpw(bytes_pwd, salt)
         return hashed_pwd
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: encrypt() ")
+        print (e)
+        return False
 
 ## Decrypt
 def decrypt(_string):
@@ -1271,7 +1277,9 @@ def b64Encode(_string):
         _r_out = str(_out, "utf-8")
         return _r_out
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: b64Encode() ")
+        print (e)
+        return False
 
 ## Base64 decode
 def b64Decode(_string):
@@ -1280,7 +1288,9 @@ def b64Decode(_string):
         _out = base64.b64decode(_string).decode('utf-8')
         return _out
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: b64Decode() ")
+        print (e)
+        return False
 
 ## Current date: 
 def currentDate():
@@ -1291,7 +1301,9 @@ def currentDate():
         _now = _now.strftime("%d%m%YH%M%S")
         return _now
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        print ( "(!) Exception in function: currrentDate() ")
+        print (e)
+        return False
 
 
 if __name__ == '__main__':
