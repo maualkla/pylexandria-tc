@@ -828,7 +828,7 @@ def workspace():
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
     
 ## Transactions service.
-@app.route('/transaction', methods=['GET'])
+@app.route('/transaction', methods=['GET','DELETE'])
 def transaction():
     try:
         ## Method: POST /workspace
@@ -931,46 +931,42 @@ def transaction():
                 _query = False if 'filter' not in request.args else request.args.get('filter')
                 ## If id filter present in url params it will save it, else will set false.
                 _id = False if 'id' not in request.args else request.args.get('id')
-                _owner = False
-                _shortCode = False
-                _active = "N"
-
+                ## set default value for limit and count. 
+                _limit =  10 
+                _count = 0
+                _action = False
+                _alert = "N"
+                _userId = False
                 ## Validate if _query present
                 if _query:
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
                     ## dictionary with the params as key value.
                     _parameters = Helpers.splitParams(_query)
+                    ## if limit param present set the limit value
+                    _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if username param present, set the owner param
-                    _owner = str(_parameters['owner']) if 'owner' in _parameters else _owner
+                    _action = str(_parameters['action']) if 'action' in _parameters else _action
                     ## if shortCode param present, set the shortCode param
-                    _shortCode = str(_parameters['shortCode']) if 'shortCode' in _parameters else _shortCode
-                    ## if active param present validates the str value, if true seet True, else set False. if not present, 
-                    ## sets _active to "N" to ignore the value
-                    if 'active' in _parameters:
-                        _active = True if str(_parameters['active']).lower() == 'true' else False
-                        
-                ## Logic to get data
+                    _userId = str(_parameters['userId']) if 'userId' in _parameters else _userId
+                    if 'alert' in _parameters:
+                        _alert = True if str(_parameters['alert']).lower() == 'true' else False
+
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
-                elif _shortCode: 
+                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
+                elif _action: 
                     ## the case of shortCode is present wull search for it.
-                    _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
-                    if _active != "N":
-                        ## In case the _active param is present in valid fashion, will search for active or inactiv
-                        ## e users.
-                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
-                elif _owner:
+                    _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
+                elif _alert != "N":
                     ## The case username is present, will search with the specific username. 
-                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _owner))
-                    if _active != "N":
-                        ## In case the _active param is present in valid fashion, will search for active or inactiv
-                        ## e users.
-                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                    _search = trx_ref.where(filter=FieldFilter("alert", "==", _alert))
+                elif _userId:
+                    ## In case activate is present, will search for active or inactive users.
+                    _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
                 else:
                     ## In case any param was present, will search all
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", ""))
+                    _search = trx_ref
 
                 ## Loop in all the users inside the users_ref object
                 _trx = {}
@@ -978,9 +974,9 @@ def transaction():
                     ## apply the to_dict() to the current user to use their information.
                     _acc = _us.to_dict()
                     ## validate if deletion was successful
-                    if deleteWorkspace(_acc['TaxId']):
+                    if transactionDelete(_acc['id']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['TaxId']] = transactionPost(_auth['userId'], False, 2, "Workspace Delete")
+                        _trx[_acc['id']] = transactionPost(_auth['userId'], False, 3, "Transaction Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -1058,6 +1054,7 @@ def deleteUser(_id, _un):
     try:
         print(" >> deleteUser() helper.")
         deleteUserTokens(_id)
+        deleteUserTrx(_id)
         if users_ref.document(_id).delete():
             return True
         else: 
@@ -1271,7 +1268,7 @@ def transactionPost(_userId, _alert, _severity, _action):
         from datetime import datetime
         _now = datetime.now()
         _dateGen = _now.strftime("%d%m%YH%M%S")
-        _trxId = randomString(4) + _dateGen + randomString(20)
+        _trxId = Helpers.randomString(4) + _dateGen + Helpers.randomString(20)
         _trx_obj = {
             "dateTime" : _dateGen,
             "userId" : _userId,
@@ -1286,6 +1283,42 @@ def transactionPost(_userId, _alert, _severity, _action):
             return False
     except Exception as e:
         print ( "(!) Exception in function: transactionPost() ")
+        print (e)
+        return False
+    
+## Transaction DELETE Service
+## Transaction Number deletor function
+## _transaction_id: Number of the transaction.
+def transactionDelete(_transaction_id):
+    try:
+        print(" >> deleteTransaction() helper.")
+        if trx_ref.document(_transaction_id).delete():
+            return True
+        else: 
+            return False
+    except Exception as e:
+        print ( "(!) Exception in function: deleteTransaction() ")
+        print (e)
+        return False
+
+## Transaction DELETE all user Transactions
+## Transaction Number deletor function
+## _transaction_id: Number of the transaction.
+def deleteUserTrx(_userId):
+    try:
+        print(" >> deleteUserTrx() helper.")
+        ## search in firestore from tokens of currrent user
+        _trx = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
+        ## Set the tokens count to know how many tokens were deleted.
+        _trx_count = 0
+        ## for each token returned
+        for _trx in _trx.stream():
+            ## if inside, _exists = true and delete current token
+            transactionDelete(_trx['id'])
+            _trx_count +=1
+        return _trx_count   
+    except Exception as e:
+        print ( "(!) Exception in function: deleteUserTrx() ")
         print (e)
         return False
 
