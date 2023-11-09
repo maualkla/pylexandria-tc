@@ -918,7 +918,10 @@ def encode():
 ### Private Services  ################################################
 ######################################################################
 
-## User Services
+## user DELETE Service
+## user (DELETE)
+## _id: (required) id of the user to be deleted
+## _un: (optional) username of the user to delete
 def deleteUser(_id, _un):
     try:
         print(" >> deleteUser() helper.")
@@ -932,7 +935,9 @@ def deleteUser(_id, _un):
         print (e)
         return False
 
-## Workspace Services
+## workspace DELETE Service
+## workspace (DELETE)
+## _id: (required) id of the workspace to be deleted
 def deleteWorkspace(_id):
     try:
         print(" >> deleteWorkspace() helper.")
@@ -941,7 +946,7 @@ def deleteWorkspace(_id):
         else: 
             return False
     except Exception as e:
-        print ( "(!) Exception in function: deleteUser() ")
+        print ( "(!) Exception in function: deleteWorkspace() ")
         print (e)
         return False
 
@@ -1039,7 +1044,10 @@ def authDelete(_id):
         return False
 
 
-## Token validation
+## auth VALIDATION Service (legacy)
+## auth (Validation)
+## _user: username of the token
+## _token: token id that wants to valdiate
 def tokenValidator(_user, _token):
     try:
         print(" >> tokenValidator() helper.")
@@ -1065,7 +1073,9 @@ def tokenValidator(_user, _token):
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
 
-## Delete all user tokens.
+## auth DELETE ALL USER TOKENS Service (legacy)
+## auth (DELETE ALL USER TOKENS)
+## _un: (required) Username that want to delete all tokens of.
 def deleteUserTokens(_un):
     print(" >> deleteUserTokens() helper.")
     ## search in firestore from tokens of currrent user
@@ -1080,7 +1090,9 @@ def deleteUserTokens(_un):
         _tokens_count += 1
     return _tokens_count    
 
-## Session Services ####################
+## session DELETE Service
+## session (DELETE)
+## _id: (required) id of the session object want to delete.
 def deleteSession(_id):
     try:
         print(" >> deleteSession() helper.")
@@ -1093,6 +1105,10 @@ def deleteSession(_id):
         print (e)
         return False
 
+## session VALIDATE Service
+## session (VALIDATE)
+## _id: (required) id of the session object want to validate.
+## _token: (required) token id vant to match.
 def validateSession(_id, _tokenid):
     try:
         _sess = sess_ref.document(_id).get()        
