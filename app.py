@@ -1136,9 +1136,12 @@ def trxGenerator(_date, _user):
         _dateGen = _now.strftime("%d%m%YH%M%S")
         _trxId = randomString(2) + _dateGen + randomString(20)
         _trx_obj = {
-            "date" : _date,
-            "user" : _user,
-            "id": _trxId
+            "dateTime" : _date,
+            "userId" : _user,
+            "id": _trxId,
+            "alert": False,
+            "severity": False,
+            "action": False
         }
         ### Por el momento no crearemos la trx por que antes necesitamos helpers para:
         ## - Eliminar trx por usuario.
