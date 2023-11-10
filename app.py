@@ -76,7 +76,7 @@ def session():
             _requested_params = True if request.json['requestString'] and request.json['client'] else False
             if _requested_params:
                 ## Get the params from the verified structure (decoding the requestString)
-                _decoded_str = b64Decode(request.json['requestString'])
+                _decoded_str = Helpers.b64Decode(request.json['requestString'])
                 ## spliting the string into the un [0] and pass [1]
                 _sess_params = _decoded_str.split("_")
                 _client = request.json['client']
@@ -150,120 +150,6 @@ def session():
         ## In case of error.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
-## Login service (deprecated)
-@app.route("/login", methods=['GET'])
-def login():
-    try:
-        ### validate parameters
-        if 'u' not in request.args or 'p' not in request.args:
-            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 400
-        else: 
-            ## save parameters into local vars, decode from b64 both password and user.
-            _username = request.args.get('u')
-            _username = b64Decode(_username)
-            _pass = request.args.get('p')
-            _pass = b64Decode(_pass)
-            ## go to firestore and get user with l_user id
-            user = users_ref.document(_username).get().to_dict()
-            ## if user not found, user will = None and will send 404, else it will continue
-            if user != None:
-                ## encrypt and decode reqpass
-                _requ = encrypt(_pass).decode('utf-8')
-                _fire = user['pass'].decode('utf-8')
-                ## validate if both pass are same and continue, else return 401
-                if _requ == _fire:
-                    ## define exist flag to false
-                    _exists = False
-                    ## delete all existing tokens for the current user.
-                    deleteUserTokens(_username)
-                    ## generates token with user, send False flag, to get a token valid for 72 hours, True for 180 days
-                    _token = authPost(_username, False)
-                    ## return _token generated before, a transaction id and a 200 code.
-                    return jsonify({"expire": "", "id": _token['id'], "username": "", "trxId": transactionPost(_username, False, 1, "Login (deprecated)"), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 200
-                else:
-                    return jsonify({"status": "Error", "code": "401", "reason": "Not Authorized, review user or password", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 401
-            else:
-                return jsonify({"status": "Error", "code": "404", "reason": "Not Authorized, review user or password", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 404
-    except Exception as e: 
-        return jsonify({"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 500
-
-## Logout Service
-@app.route('/logout', methods=['GET'])
-def logout():
-    try:
-        ### validate parameters
-        if '_id' not in request.args or '_username' not in request.args:
-            ## Return error response, missing required fields
-            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 400
-        else: 
-            ## get and decode the request parameter
-            _username = request.args.get('_username')
-            _username = b64Decode(_username)
-            ## Delete all user related tokens.
-            _tokens = deleteUserTokens(_username)
-            transactionPost(_username, False, 1, "Logout (deprecated)")
-            ## Return 440 logout http response code.
-            if _tokens > 0:
-                return jsonify({"status": "success", "code": "440", "reason": "session closed", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 440
-            else:
-                return jsonify({"status": "error", "code": "404", "reason": "User not logged.", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 404
-    except Exception as e: 
-        return jsonify({"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 500
-
-## Sign up service
-@app.route('/signup', methods=['POST'])
-def signup():
-    try:
-        ## Validate required values, first creating a list of all required
-        req_fields = ['username', 'bday', 'fname', 'pass', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type']
-        ## go and iterate to find all of them, if not _go will be false
-        _go = True
-        for req_value in req_fields:
-            if req_value not in request.json:
-                _go = False
-
-        ## if go, start the sign up flow, else 400 code to indicate a bad request.
-        if _go:
-            ## Get email from request.json
-            s_email = request.json['email']
-            ## Query email to see if the user is yet created.
-            user = users_ref.document(s_email).get()
-            user = user.to_dict()
-            ## if user == None means user is not yet created, so flow continues, else return 409 indicating email already registered.
-            if user == None:
-                ## get pass from payload and decode 64 and then encrypt
-                _pcode = request.json['pass']
-                _pcode = b64Decode(_pcode)
-                _pwrd = encrypt(_pcode)
-                ## Create object to create the new user.
-                objpay = {
-                    "activate": True,
-                    "username": request.json['username'],
-                    "bday": request.json['bday'],
-                    "email": request.json['email'],
-                    "fname": request.json['fname'],
-                    "pass": _pwrd,
-                    "phone": request.json['phone'],
-                    "pin": request.json['pin'],
-                    "plan": request.json['plan'],
-                    "postalCode": request.json['postalCode'],
-                    "terms": request.json['terms'],
-                    "type": request.json['type']
-                }
-                ## Get current date
-                _tempdate = str(currentDate())
-                ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
-                if users_ref.document(s_email).set(objpay):
-                    return jsonify({"trxId": transactionPost(s_email, False, 1, "Signup (deprecated)"), "alert": "this service is deprecated and will be removed by v0.03 - Use the /user service instead."}), 202
-                else:
-                    return jsonify({"status": "Error while creating user. ", "alert": "this service is deprecated and will be removed by v0.03 - Use the /user service instead."}), 500
-            else:
-                return jsonify({"status": "Email already registered", "alert": "this service is deprecated and will be removed by v0.03 - Use the /user service instead." }), 409
-        else: 
-            return jsonify({"status": "Review request payload", "alert": "this service is deprecated and will be removed by v0.03 - Use the /user service instead."}), 400
-    except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
-    
 ## user service
 @app.route('/user', methods=['POST','PUT','GET','DELETE'])
 def user():
@@ -298,7 +184,7 @@ def user():
                         ## get pass from payload and decode 64 and then encrypt
                         _user_post_params = ['activate','username','bday','email','fname','phone','pin','plan','postalCode','terms','type', 'tenant']
                         _pcode = request.json['pass']
-                        _pwrd = encrypt(b64Decode(_pcode))
+                        _pwrd = encrypt(Helpers.b64Decode(_pcode))
                         _pcode = ""
                         ## Create object to create the new user.
                         _objpay = {}
@@ -355,7 +241,7 @@ def user():
                     ## in case the user wants to update the password.
                     if 'pass' in request.json:
                         ## decoding base 64 pass.
-                        _encoded_pass = b64Decode(request.json['pass'])
+                        _encoded_pass = Helpers.b64Decode(request.json['pass'])
                         ## Encryting pass
                         _encoded_pass = encrypt(_encoded_pass)
                         ## Appending to the payoad
@@ -831,8 +717,8 @@ def workspace():
 @app.route('/transaction', methods=['GET','DELETE'])
 def transaction():
     try:
-        ## Method: POST /workspace
-        if request.method == 'POST':
+        ## Method: GET /transaction
+        if request.method == 'GET':
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
                 ## In case are present, call validate session. True if valid, else not valid. Fixed to true
@@ -865,9 +751,9 @@ def transaction():
                     _parameters = Helpers.splitParams(_query)
                     ## if limit param present set the limit value
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
-                    ## if username param present, set the owner param
+                    ## if action param present, set the action param
                     _action = str(_parameters['action']) if 'action' in _parameters else _action
-                    ## if shortCode param present, set the shortCode param
+                    ## if userId param present, set the userId param
                     _userId = str(_parameters['userId']) if 'userId' in _parameters else _userId
                     if 'alert' in _parameters:
                         _alert = True if str(_parameters['alert']).lower() == 'true' else False
@@ -992,37 +878,6 @@ def transaction():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
         return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
-## (deprecated) v0.01 Auth a token.
-@app.route('/vauth', methods=['POST'])
-def vauth():
-    try:
-        vauth = tokenValidator(request.json['username'], request.json['id'])
-        if vauth:
-            return jsonify({"status": "valid", "alert": "this service is deprecated and will be removed by v0.03 - Use the /auth service instead."}), 200
-        else:
-            return jsonify({"status": "not-valid", "alert": "this service is deprecated and will be removed by v0.03 - Use the /auth service instead."}), 200
-    except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
-    
-## Auth a token.
-@app.route('/auth', methods=['POST'])
-def auth():
-    try:
-        ## Validate if required fields are in the json request.
-        if 'id' not in request.json or 'username' not in request.json:
-            ## Return error response, missing required fields
-            return jsonify({"status": "Error", "code": "400", "reason": "Missing required fields", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}), 400
-        else: 
-            ## go to tokenValidator and retrieve a valid or expired status.
-            _auth = tokenValidator(request.json['username'], request.json['id'])
-            if _auth:
-                _response = {"status": "valid", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
-            else:
-                _response = {"status": "error", "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
-            ## return the tokenvalidator status and a 200 code.
-            return _response, 200
-    except Exception as e:
-        return {"status":"Error", "code": "500", "reason": str(e), "alert": "Warning, this Login service is deprecated and faces partial functionality. Please refer to the APIDOCS to see an alternative. This service will be deleted for the v0.05 of the product."}
 
 ## API Status
 @app.route('/')
@@ -1034,8 +889,8 @@ def status():
 def encode():
     try:
         if request.args.get('_string'):
-            _b64 = b64Encode(request.args.get('_string'))
-            _dec = b64Decode(_b64)
+            _b64 = Helpers.b64Encode(request.args.get('_string'))
+            _dec = Helpers.b64Decode(_b64)
             return jsonify({"status": "success", "original": _dec, "encoded": _b64}), 200
         else:
             return jsonify({"status", "error"}), 400
@@ -1091,7 +946,7 @@ def authPost(_user, _ilimited):
         ## get current time
         current_date_time = datetime.now()
         ## generates string for the token
-        token = idGenerator(10)
+        token = Helpers.idGenerator(10)
         ## validates if _limited param present
         if _ilimited:
             ## if ilimited set token expiracy for 180days
@@ -1326,30 +1181,6 @@ def deleteUserTrx(_userId):
 ### Helpers ############################
 ########################################
 
-## return String (lenght)
-def randomString(_length):
-    try:
-        print(" >> randomString() helper.")
-        import random, string
-        output_str = ''.join(random.choice(string.ascii_letters) for i in range(_length))
-        return output_str
-    except Exception as e:
-        print ( "(!) Exception in function: randomString() ")
-        print (e)
-        return False
-
-## return userId
-def idGenerator(_length):
-    try:
-        print(" >> idGenerator() helper.")
-        userId = currentDate()
-        userId = randomString(2) + userId + randomString(_length)
-        return userId
-    except Exception as e:
-        print ( "(!) Exception in function: idGenerator() ")
-        print (e)
-        return False
-
 ## Encrypt
 def encrypt(_string):
     try:    
@@ -1361,47 +1192,6 @@ def encrypt(_string):
         return hashed_pwd
     except Exception as e:
         print ( "(!) Exception in function: encrypt() ")
-        print (e)
-        return False
-
-## Decrypt
-def decrypt(_string):
-    
-    return False
-    
-## Base64 encode
-def b64Encode(_string):
-    try:
-        print(" >> b64Encode() helper.")
-        _out = base64.b64encode(_string.encode('utf-8'))
-        _r_out = str(_out, "utf-8")
-        return _r_out
-    except Exception as e:
-        print ( "(!) Exception in function: b64Encode() ")
-        print (e)
-        return False
-
-## Base64 decode
-def b64Decode(_string):
-    try:
-        print(" >> b64Decode() helper.")
-        _out = base64.b64decode(_string).decode('utf-8')
-        return _out
-    except Exception as e:
-        print ( "(!) Exception in function: b64Decode() ")
-        print (e)
-        return False
-
-## Current date: 
-def currentDate():
-    try:
-        print(" >> currrentDate() helper.")
-        from datetime import datetime
-        _now = datetime.now()
-        _now = _now.strftime("%d%m%YH%M%S")
-        return _now
-    except Exception as e:
-        print ( "(!) Exception in function: currrentDate() ")
         print (e)
         return False
 
