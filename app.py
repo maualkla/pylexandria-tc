@@ -291,6 +291,8 @@ def user():
                 ## set default value for limit and count. 
                 _limit =  10 
                 _count = 0
+                _username = False
+                _active = "N"
                 ## Validate if _query present
                 if _query:
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
@@ -299,13 +301,11 @@ def user():
                     ## if limit param present set the limit value
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if username param present, set the username param
-                    _username = str(_parameters['username']) if 'username' in _parameters else False
+                    _username = str(_parameters['username']) if 'username' in _parameters else _username
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
-                        _active = True if str(_parameters['active']).lower() == 'true' else False
-                    else: 
-                        _active = "N"
+                        _active = True if str(_parameters['active']).lower() == 'true' else _active
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
