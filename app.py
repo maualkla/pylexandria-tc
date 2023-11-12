@@ -677,7 +677,7 @@ def workspace():
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
                 elif _owner:
                     ## The case username is present, will search with the specific username. 
-                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _owner))
+                    _search = wsp_ref.where(filter=FieldFilter("Owner", "==", _owner))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
