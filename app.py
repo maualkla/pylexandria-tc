@@ -281,7 +281,7 @@ def user():
                 _auth = False
             if _auth:
                 ## list all the values to be returned in the get object.
-                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant'] 
+                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
