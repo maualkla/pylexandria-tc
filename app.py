@@ -366,7 +366,7 @@ def user():
         ## Method: GET /user
         elif request.method == 'GET': 
             ## list all the values to be returned in the get object.
-            _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type'] 
+            _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','pin'] 
             ### Set the base for the json block to be returned. Define the data index for the list of users
             _json_data_block = {"items": []}
             ## Define _limit, _count, containsData and query
