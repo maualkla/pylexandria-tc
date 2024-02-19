@@ -1,6 +1,6 @@
 ## utilities.helpers
 
-import os, base64
+import os, base64, re
 
 class Helpers:
     ## return String (lenght)
@@ -76,6 +76,28 @@ class Helpers:
                 return _response
             else:
                 return {"status":"params_query_not_valid"}
+        except Exception as e:
+            print(" (!) Exception in splitParameters(): ")
+            print(str(e))
+            return False
+    
+    ## Validates a password based on the following criteria:
+    ## - At least 12 characters long
+    ## - Contains at least one uppercase letter
+    ## - Contains at least one lowercase letter
+    ## - Contains at least one number
+    ## - Contains at least one special character
+    ##
+    ## Args:
+    ##    password: The password to validate.
+    ##
+    ## Returns:
+    ##    True if the password is valid, False otherwise.
+    def validatePassword(_pass, _pattern):
+        try:
+            match = re.match(_pattern, _pass)
+            return bool(match)
+        
         except Exception as e:
             print(" (!) Exception in splitParameters(): ")
             print(str(e))

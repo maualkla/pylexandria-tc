@@ -26,6 +26,7 @@ app.config.from_object(Config)
 
 ## Initialize Firestone DB
 cred = credentials.Certificate('key.json')
+pattern = app.config['PATTERN']
 default_app = initialize_app(cred)
 db = firestore.client()
 users_ref = db.collection('users')
@@ -169,11 +170,16 @@ def user():
                 req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
                 ## go and iterate to find all of them, if not _go will be false
                 _go = True
+                _go_validation = True
                 for req_value in req_fields:
                     if req_value not in request.json:
                         _go = False
+                    ## validate pass includes all required validations
+                    if req_value == 'pass' and Helpers.validatePassword(request.json[req_value], pattern) == False:
+                        _go_validation = False
+                        print( "(!) Password Validation invalid")
                 ## if go, start the sign up flow, else 400 code to indicate a bad request.
-                if _go:
+                if _go and _go_validation:
                     ## Get email from request.json
                     s_email = request.json['email']
                     ## Query email to see if the user is yet created.
