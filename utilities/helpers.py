@@ -93,13 +93,81 @@ class Helpers:
     ##
     ## Returns:
     ##    True if the password is valid, False otherwise.
-    def validatePassword(_pass, _pattern):
+    def validatePasswordFormat(_pass):
         try:
             print(" >> validatePassword() helper.")
-            match = re.match(_pattern, _pass)
+            pattern = r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{12,}$"
+            return Helpers.validatePattern(_pass, pattern)
+        
+        except Exception as e:
+            print(" (!) Exception in validatePassword(): ")
+            print(str(e))
+            return False
+        
+    ## Validate email format
+    def validateEmailFormat(_string):
+        try:
+            print(" >> validateEmailFormat() helper.")
+            pattern = r"^[a-zA-Z0-9-_.]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9]+)*$"
+            return Helpers.validatePattern(_string, pattern)
+        
+        except Exception as e:
+            print(" (!) Exception in validateEmailFormat(): ")
+            print(str(e))
+            return False
+
+    ## Validate date format.
+    def validateDateFormat(_string):
+        try:
+            print(" >> validateDateFormat() helper.")
+            pattern = r"^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[012])\.(19|20)\d\d$"
+            return Helpers.validatePattern(_string, pattern)
+        
+        except Exception as e:
+            print(" (!) Exception in validateDateFormat(): ")
+            print(str(e))
+            return False
+
+    ## Validate phone number format
+    def validatePhoneFormat(_string):
+        try:
+            print(" >> validatePhoneFormat() helper.")
+            pattern = r"^\d{10}$"
+            return Helpers.validatePattern(_string, pattern)
+        
+        except Exception as e:
+            print(" (!) Exception in validatePhoneFormat(): ")
+            print(str(e))
+            return False
+    
+    ## Validate postal code format.
+    def validatePostalCodeFormat(_string, _countryCode):
+        try:
+            print(" >> validatePhoneFormat() helper.")
+            if _countryCode == "MX": 
+                pattern = r"^\d{5}$"
+            elif _countryCode == "US": 
+                pattern = r"^\d{5}(-\d{4})?$"
+            elif _countryCode == "DE":
+                pattern = r"^\d{5}$"
+            else: 
+                pattern = r"^\d{5}$"
+            return Helpers.validatePattern(_string, pattern)
+        
+        except Exception as e:
+            print(" (!) Exception in validatePhoneFormat(): ")
+            print(str(e))
+            return False
+
+    ## Validate pattern
+    def validatePattern(_string, _pattern):
+        try: 
+            print(" >> validatePattern() helper.")
+            match = re.match(_string, _pattern)
             return bool(match)
         
         except Exception as e:
-            print(" (!) Exception in splitParameters(): ")
+            print(" (!) Exception in validatePattern(): ")
             print(str(e))
             return False
+
