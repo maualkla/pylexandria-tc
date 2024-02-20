@@ -24,6 +24,9 @@ app = Flask(__name__)
 ## Setup env vars
 app.config.from_object(Config)
 
+## Logging 
+logging = app.config['LOGGING']
+
 ## Initialize Firestone DB
 cred = credentials.Certificate('key.json')
 pattern = app.config['PATTERN']
@@ -177,7 +180,7 @@ def user():
                     ## validate pass includes all required validations
                     if req_value == 'pass' and Helpers.validatePassword(request.json[req_value], pattern) == False:
                         _go_validation = False
-                        print( "(!) Password Validation invalid")
+                        if logging: print( "(!) Password Validation invalid ")
                 ## if go, start the sign up flow, else 400 code to indicate a bad request.
                 if _go and _go_validation:
                     ## Get email from request.json
@@ -209,7 +212,7 @@ def user():
                         return jsonify({"status": "Error", "code": 409, "reason": "Email already registered" }), 409
                 else: 
                     ## There are missing required fields.
-                    return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
+                    return jsonify({"status": "Error", "code": 403, "reason": "Missing required fields or Validation Error"}), 403
             else: 
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401

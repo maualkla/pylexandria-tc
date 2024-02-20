@@ -95,6 +95,7 @@ class Helpers:
     ##    True if the password is valid, False otherwise.
     def validatePassword(_pass, _pattern):
         try:
+            print(" >> validatePassword() helper.")
             match = re.match(_pattern, _pass)
             return bool(match)
         
