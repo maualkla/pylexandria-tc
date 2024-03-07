@@ -214,7 +214,7 @@ def user():
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
-                            return jsonify({"trxId": transactionPost(s_email, False, 1, "User Post")}), 202
+                            return jsonify({"code": 202, "trxId": transactionPost(s_email, False, 1, "User Post")}), 202
                         else:
                             ## The user wasnt created and the service returned a error.
                             return jsonify({"status": "Error", "code": 500, "reason": "Error while creating user. "}), 500
@@ -903,7 +903,8 @@ def transaction():
 ## API Status
 @app.route('/')
 def status():
-    return "<p>App Status: <markup style='color:green'>Running fine</markup></p>"
+    local_ip = request.remote_addr
+    return "<html><head><title>Alexandria Status</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
 
 ## Encode token.
 @app.route('/encode', methods=['GET'])

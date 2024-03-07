@@ -52,6 +52,17 @@ class Helpers:
             return _now
         except Exception as e:
             return {"status": "An error Occurred", "error": str(e)}
+    
+    ## Current date: 
+    def currentDateTime():
+        try:
+            print(" >> currrentDateTime() helper.")
+            from datetime import datetime
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            return current_time
+        except Exception as e:
+            return {"status": "An error Occurred", "error": str(e)}
         
     ## Get URL parameters:
     ## Function receive a string like this "limit:10;username:maualkla;active:true"
