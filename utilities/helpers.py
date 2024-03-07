@@ -1,6 +1,6 @@
 ## utilities.helpers
 
-import os, base64, re
+import os, base64, re, rsa
 
 class Helpers:
     ## return String (lenght)
@@ -93,11 +93,11 @@ class Helpers:
     ##
     ## Returns:
     ##    True if the password is valid, False otherwise.
-    def validatePasswordFormat(_pass):
+    def validatePasswordFormat(_string, _logging):
         try:
             print(" >> validatePassword() helper.")
-            pattern = r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{12,}$"
-            return Helpers.validatePattern(_pass, pattern)
+            pattern = r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{12,}$" ## PP@ssw0rd!234
+            return Helpers.validatePattern(_string, pattern, _logging)
         
         except Exception as e:
             print(" (!) Exception in validatePassword(): ")
@@ -105,11 +105,11 @@ class Helpers:
             return False
         
     ## Validate email format
-    def validateEmailFormat(_string):
+    def validateEmailFormat(_string, _logging):
         try:
             print(" >> validateEmailFormat() helper.")
-            pattern = r"^[a-zA-Z0-9-_.]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9]+)*$"
-            return Helpers.validatePattern(_string, pattern)
+            pattern = r"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$"
+            return Helpers.validatePattern(_string, pattern, _logging)
         
         except Exception as e:
             print(" (!) Exception in validateEmailFormat(): ")
@@ -117,11 +117,11 @@ class Helpers:
             return False
 
     ## Validate date format.
-    def validateDateFormat(_string):
+    def validateDateFormat(_string, _logging):
         try:
             print(" >> validateDateFormat() helper.")
             pattern = r"^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[012])\.(19|20)\d\d$"
-            return Helpers.validatePattern(_string, pattern)
+            return Helpers.validatePattern(_string, pattern, _logging)
         
         except Exception as e:
             print(" (!) Exception in validateDateFormat(): ")
@@ -129,11 +129,11 @@ class Helpers:
             return False
 
     ## Validate phone number format
-    def validatePhoneFormat(_string):
+    def validatePhoneFormat(_string, _logging):
         try:
             print(" >> validatePhoneFormat() helper.")
             pattern = r"^\d{10}$"
-            return Helpers.validatePattern(_string, pattern)
+            return Helpers.validatePattern(_string, pattern, _logging)
         
         except Exception as e:
             print(" (!) Exception in validatePhoneFormat(): ")
@@ -141,7 +141,7 @@ class Helpers:
             return False
     
     ## Validate postal code format.
-    def validatePostalCodeFormat(_string, _countryCode):
+    def validatePostalCodeFormat(_string, _countryCode, _logging):
         try:
             print(" >> validatePhoneFormat() helper.")
             if _countryCode == "MX": 
@@ -152,7 +152,7 @@ class Helpers:
                 pattern = r"^\d{5}$"
             else: 
                 pattern = r"^\d{5}$"
-            return Helpers.validatePattern(_string, pattern)
+            return Helpers.validatePattern(_string, pattern, _logging)
         
         except Exception as e:
             print(" (!) Exception in validatePhoneFormat(): ")
@@ -160,10 +160,10 @@ class Helpers:
             return False
 
     ## Validate pattern
-    def validatePattern(_string, _pattern):
+    def validatePattern(_string, _pattern, _logging):
         try: 
-            print(" >> validatePattern() helper.")
-            match = re.match(_string, _pattern)
+            if _logging: print(" >> validatePattern() helper. String: " + str(_string) + " Pattern: " + str(_pattern) + ".")
+            match = re.match(_pattern, _string)
             return bool(match)
         
         except Exception as e:

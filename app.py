@@ -178,17 +178,17 @@ def user():
                     if req_value not in request.json:
                         _go = False
                     ## validate phone number includes all required validations
-                    if req_value == 'phone' and Helpers.validatePhoneFormat(request.json[req_value]) == False:
+                    if req_value == 'phone' and Helpers.validatePhoneFormat(request.json[req_value], logging) == False:
                         _go_validation = False
                         _validation_errors["phone"] = "Phone number format is not valid"
                         if logging: print( "(!) Phone number format is not valid ")
                     ## validate pwd includes all required validations
-                    if req_value == 'pass' and Helpers.validatePasswordFormat(request.json[req_value]) == False:
+                    if req_value == 'pass' and Helpers.validatePasswordFormat(Helpers.b64Decode(request.json[req_value]), logging) == False:
                         _go_validation = False
                         _validation_errors["password"] = "Password format is not valid"
                         if logging: print( "(!) Password Validation invalid ")
                 ## Validate the format of the email the user typed
-                if request.json['email'] and Helpers.validateEmailFormat(request.json['email']) == False:
+                if request.json['email'] and Helpers.validateEmailFormat(request.json['email'], logging) == False:
                     _go_validation = False
                     _validation_errors["email"] = "User Email format is not valid"
                     if logging: print( "(!) User Email format is not valid ")
@@ -223,6 +223,7 @@ def user():
                         return jsonify({"status": "Error", "code": 409, "reason": "Email already registered" }), 409
                 else: 
                     ## There are missing required fields.
+                    print(_validation_errors)
                     return jsonify({"status": "Error", "code": 403, "reason": "Missing required fields or Validation Error", "validation_errors": _validation_errors}), 403
             else: 
                 ## Missing authorization headers.
