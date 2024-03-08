@@ -107,8 +107,9 @@ class Helpers:
     def validatePasswordFormat(_string, _logging):
         try:
             print(" >> validatePassword() helper.")
-            pattern = r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{12,}$" ## PP@ssw0rd!234
-            return Helpers.validatePattern(_string, pattern, _logging)
+            ##pattern = r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{12,}$" ## PP@ssw0rd!234
+            ##return Helpers.validatePattern(_string, pattern, _logging)
+            return True if len(_string) >= 10 else False
         
         except Exception as e:
             print(" (!) Exception in validatePassword(): ")
