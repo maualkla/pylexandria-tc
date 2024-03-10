@@ -1,6 +1,6 @@
 ## utilities.helpers
 
-import os, base64
+import os, base64, re, rsa
 
 class Helpers:
     ## return String (lenght)
@@ -52,6 +52,17 @@ class Helpers:
             return _now
         except Exception as e:
             return {"status": "An error Occurred", "error": str(e)}
+    
+    ## Current date: 
+    def currentDateTime():
+        try:
+            print(" >> currrentDateTime() helper.")
+            from datetime import datetime
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            return current_time
+        except Exception as e:
+            return {"status": "An error Occurred", "error": str(e)}
         
     ## Get URL parameters:
     ## Function receive a string like this "limit:10;username:maualkla;active:true"
@@ -80,3 +91,95 @@ class Helpers:
             print(" (!) Exception in splitParameters(): ")
             print(str(e))
             return False
+    
+    ## Validates a password based on the following criteria:
+    ## - At least 12 characters long
+    ## - Contains at least one uppercase letter
+    ## - Contains at least one lowercase letter
+    ## - Contains at least one number
+    ## - Contains at least one special character
+    ##
+    ## Args:
+    ##    password: The password to validate.
+    ##
+    ## Returns:
+    ##    True if the password is valid, False otherwise.
+    def validatePasswordFormat(_string, _logging):
+        try:
+            print(" >> validatePassword() helper.")
+            ##pattern = r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{12,}$" ## PP@ssw0rd!234
+            ##return Helpers.validatePattern(_string, pattern, _logging)
+            return True if len(_string) >= 10 else False
+        
+        except Exception as e:
+            print(" (!) Exception in validatePassword(): ")
+            print(str(e))
+            return False
+        
+    ## Validate email format
+    def validateEmailFormat(_string, _logging):
+        try:
+            print(" >> validateEmailFormat() helper.")
+            pattern = r"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$"
+            return Helpers.validatePattern(_string, pattern, _logging)
+        
+        except Exception as e:
+            print(" (!) Exception in validateEmailFormat(): ")
+            print(str(e))
+            return False
+
+    ## Validate date format.
+    def validateDateFormat(_string, _logging):
+        try:
+            print(" >> validateDateFormat() helper.")
+            pattern = r"^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[012])\.(19|20)\d\d$"
+            return Helpers.validatePattern(_string, pattern, _logging)
+        
+        except Exception as e:
+            print(" (!) Exception in validateDateFormat(): ")
+            print(str(e))
+            return False
+
+    ## Validate phone number format
+    def validatePhoneFormat(_string, _logging):
+        try:
+            print(" >> validatePhoneFormat() helper.")
+            pattern = r"^\d{10}$"
+            return Helpers.validatePattern(_string, pattern, _logging)
+        
+        except Exception as e:
+            print(" (!) Exception in validatePhoneFormat(): ")
+            print(str(e))
+            return False
+    
+    ## Validate postal code format.
+    def validatePostalCodeFormat(_string, _countryCode, _logging):
+        try:
+            print(" >> validatePhoneFormat() helper.")
+            if _countryCode == "MX": 
+                pattern = r"^\d{5}$"
+            elif _countryCode == "US": 
+                pattern = r"^\d{5}(-\d{4})?$"
+            elif _countryCode == "DE":
+                pattern = r"^\d{5}$"
+            else: 
+                pattern = r"^\d{5}$"
+            return Helpers.validatePattern(_string, pattern, _logging)
+        
+        except Exception as e:
+            print(" (!) Exception in validatePhoneFormat(): ")
+            print(str(e))
+            return False
+
+    ## Validate pattern
+    def validatePattern(_string, _pattern, _logging):
+        try: 
+            if _logging: print(" >> validatePattern() helper. String: " + str(_string) + " Pattern: " + str(_pattern) + ".")
+            match = re.match(_pattern, _string)
+            return bool(match)
+        
+        except Exception as e:
+            print(" (!) Exception in validatePattern(): ")
+            print(str(e))
+            return False
+

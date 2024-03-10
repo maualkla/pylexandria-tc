@@ -24,6 +24,9 @@ app = Flask(__name__)
 ## Setup env vars
 app.config.from_object(Config)
 
+## Logging 
+logging = app.config['LOGGING']
+
 ## Initialize Firestone DB
 cred = credentials.Certificate('key.json')
 default_app = initialize_app(cred)
@@ -168,12 +171,29 @@ def user():
                 ## Validate required values, first creating a list of all required
                 req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
                 ## go and iterate to find all of them, if not _go will be false
+                _validation_errors = {}
                 _go = True
+                _go_validation = True
                 for req_value in req_fields:
                     if req_value not in request.json:
                         _go = False
+                    ## validate phone number includes all required validations
+                    if req_value == 'phone' and Helpers.validatePhoneFormat(request.json[req_value], logging) == False:
+                        _go_validation = False
+                        _validation_errors["phone"] = "Phone number format is not valid"
+                        if logging: print( "(!) Phone number format is not valid ")
+                    ## validate pwd includes all required validations
+                    if req_value == 'pass' and Helpers.validatePasswordFormat(Helpers.b64Decode(request.json[req_value]), logging) == False:
+                        _go_validation = False
+                        _validation_errors["password"] = "Password format is not valid"
+                        if logging: print( "(!) Password Validation invalid ")
+                ## Validate the format of the email the user typed
+                if request.json['email'] and Helpers.validateEmailFormat(request.json['email'], logging) == False:
+                    _go_validation = False
+                    _validation_errors["email"] = "User Email format is not valid"
+                    if logging: print( "(!) User Email format is not valid ")
                 ## if go, start the sign up flow, else 400 code to indicate a bad request.
-                if _go:
+                if _go and _go_validation:
                     ## Get email from request.json
                     s_email = request.json['email']
                     ## Query email to see if the user is yet created.
@@ -194,7 +214,7 @@ def user():
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
-                            return jsonify({"trxId": transactionPost(s_email, False, 1, "User Post")}), 202
+                            return jsonify({"code": 202, "trxId": transactionPost(s_email, False, 1, "User Post")}), 202
                         else:
                             ## The user wasnt created and the service returned a error.
                             return jsonify({"status": "Error", "code": 500, "reason": "Error while creating user. "}), 500
@@ -203,7 +223,8 @@ def user():
                         return jsonify({"status": "Error", "code": 409, "reason": "Email already registered" }), 409
                 else: 
                     ## There are missing required fields.
-                    return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
+                    print(_validation_errors)
+                    return jsonify({"status": "Error", "code": 403, "reason": "Missing required fields or Validation Error", "validation_errors": _validation_errors}), 403
             else: 
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
@@ -503,7 +524,7 @@ def workspace():
                     ## continue if a workspace with the taxId send already exist and the owner match.
                     if _wsp_exist != None and _fs_user['Owner'] == request.json['Owner']:
                         ## Creation of the optional fields that could be sent to update the workspace.
-                        _opt_fields = ['LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexcolor','Active']
+                        _opt_fields = ['LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -882,7 +903,8 @@ def transaction():
 ## API Status
 @app.route('/')
 def status():
-    return "<p>App Status: <markup style='color:green'>Running fine</markup></p>"
+    local_ip = request.remote_addr
+    return "<html><head><title>Alexandria Status</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
 
 ## Encode token.
 @app.route('/encode', methods=['GET'])
