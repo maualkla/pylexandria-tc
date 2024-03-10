@@ -36,6 +36,7 @@ tokens_ref = db.collection('tokens')
 trx_ref = db.collection('transactions')
 wsp_ref = db.collection('workspaces')
 sess_ref = db.collection('sessions')
+tentus_ref = db.collection('tenantUser')
 
 ## Session Service
 @app.route('/session', methods=['GET', 'POST', 'DELETE'])
@@ -733,7 +734,140 @@ def workspace():
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
-    
+
+
+## Tenant User Service 
+@app.route('/tenantUser', methods=['GET','POST','UPDATE','DELETE'])
+def tenantUser():
+    try:
+        ## Method: POST /workspace
+        if request.method == 'POST':
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                ## Look for the workspace to exist.
+                if 'Id' in request.json:
+                    ## Search for a wsp with that TaxId
+                    _tnun_exist = tentus_ref.document(request.json['Id']).get()
+                    ## format the json object
+                    _tnun_exist = _tnun_exist.to_dict()
+                ## If the wsp with that taxId do not exists proceeeds, otherwise return a 403 http code.
+                if _tnun_exist == None:
+                    ## Validate required values, first creating a list of all required
+                    req_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                    ## go and iterate to find all of them, if not _go will be false
+                    _go = True
+                    ## For Loop going for all the required fields.
+                    for req_value in req_fields:
+                        ## if it is not in the parameters, set flag to false.
+                        if req_value not in request.json:
+                            _go = False
+                    if _go:
+                        ## Create json template for the payload
+                        _json_template = '{ }'
+                        ## Load the json payload 
+                        _json_payload = json.loads(_json_template)
+                        ## Create a for loop addressing all the required fields
+                        for req_value in req_fields:
+                            ## update _json_payload object adding current field.
+                            _json_payload.update({req_value: request.json[req_value]})
+                        _json_payload.update({"Active": True})
+                        # create workspace.
+                        try:
+                            ## Call to create the workspace.
+                            tentus_ref.document(request.json['Id']).set(_json_payload)
+                        except Exception as e:
+                            ## In case of an error updating the user, retrieve a error message.
+                            print('(!) >> Handled external service exception: ' + str(e) )
+                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
+                        ## in case the ws is created, returns 200 abd the trxId 
+                        return jsonify({"status": "success", "code": 200, "reason": "timeLog created succesfully.", "trxId": transactionPost(request.json['CreatedBy'],False, 1, "Tenant User POST")}), 200
+                    else:
+                        ## in case any required field is not present, will return a 400
+                        return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
+                else: 
+                    ## In case ws TaxId is already registered, will trwo a 403 error.
+                    return jsonify({"status": "Error", "code": 403, "reason": "Workspace TaxId already registered."}), 403
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+        ## Method: PUT /workspace
+        elif request.method == 'PUT':
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                ## Look for the workspace to exist.
+                if 'Id' in request.json and 'Tenant' in request.json:
+                    ## Search for a wsp with that TaxId
+                    _wsp_exist = wsp_ref.document(request.json['Id'])
+                    ## format the json object to get values from it
+                    _fs_user = _wsp_exist.get().to_dict()
+                    ## continue if a workspace with the taxId send already exist and the owner match.
+                    if _wsp_exist != None and _fs_user['Tenant'] == request.json['Tenant']:
+                        ## Creation of the optional fields that could be sent to update the workspace.
+                        _opt_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                        ## define a flag to send or not the request.
+                        _go = False
+                        ## Create json template for the payload
+                        _json_template = '{ }'
+                        ## Load the json payload 
+                        _json_payload = json.loads(_json_template)
+                        ## Create a for loop addressing all the required fields
+                        for req_value in _opt_fields:
+                            ## In case required field in json payload 
+                            if req_value in request.json:
+                                ## update _json_payload object adding current field.
+                                _json_payload.update({req_value: request.json[req_value]})
+                                ## update flag to update user
+                                _go = True
+                        if _go:
+                            try:
+                                ## Call to create the workspace.
+                                _response = _wsp_exist.update(_json_payload)
+                            except Exception as e:
+                                ## In case of an error updating the user, retrieve a error message.
+                                print('(!) >> Handled external service exception: ' + str(e) )
+                                return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
+                            ## in case the ws is created, returns 200 abd the trxId 
+                            return jsonify({"status": "success", "code": 202, "reason": "Workspace updated succesfully.", "trxId": transactionPost(request.json['Owner'], False, 1, "Workspace Put")}), 202
+                        else:
+                            ## in case any required field is not present, will return a 400
+                            return jsonify({"status": "Error", "code": 400, "reason": "No fields to be updated, review the request."}), 400
+                    else:
+                        ## In case ws TaxId is already registered, will trwo a 403 error.
+                        return jsonify({"status": "Error", "code": 403, "reason": "Workspace not found or Owner user does not match. Review the payload and try again."}), 403
+                else:
+                    ## in case any required field is not present, will return a 400
+                    return jsonify({"status": "Error", "code": 400, "reason": "Review request payload"}), 400
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+        ## Method: GET /workspace
+        elif request.method == 'GET': 
+            return ""
+        ## Method: DELETE /workspace
+        elif request.method == 'DELETE':
+            return ""
+    except Exception as e:
+        print (e)
+        ## in case of error prints the exception and the code.
+        return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
+
+
 ## Transactions service.
 @app.route('/transaction', methods=['GET','DELETE'])
 def transaction():
