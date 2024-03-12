@@ -813,13 +813,13 @@ def tenantUser():
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json and 'Tenant' in request.json:
                     ## Search for a wsp with that TaxId
-                    _tnun_exist = tentus_ref.document(request.json['Id'])
+                    _tnun_exist = tentus_ref.document(request.json['id'])
                     ## format the json object to get values from it
                     _fs_user = _tnun_exist.get().to_dict()
                     ## continue if a tenantUser with the taxId send already exist and the owner match.
                     if _tnun_exist != None and _fs_user['Tenant'] == request.json['Tenant']:
                         ## Creation of the optional fields that could be sent to update the tenantUser.
-                        _opt_fields = ['Username', 'Password', 'FullName', 'Email', 'Manager', 'Type']
+                        req_fields = ['Username', 'Password', 'FullName', 'Email', 'Manager', 'Type']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -827,7 +827,7 @@ def tenantUser():
                         ## Load the json payload 
                         _json_payload = json.loads(_json_template)
                         ## Create a for loop addressing all the required fields
-                        for req_value in _opt_fields:
+                        for req_value in req_fields:
                             ## In case required field in json payload 
                             if req_value in request.json:
                                 ## update _json_payload object adding current field.
@@ -869,7 +869,7 @@ def tenantUser():
                 _auth = False
             if _auth:
                 ## list all the values to be returned in the get object.
-                _ws_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                req_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -879,8 +879,8 @@ def tenantUser():
                 ## set default value for limit and count. 
                 _limit =  10 
                 _count = 0
-                _owner = False
-                _shortCode = False
+                _tenant = False
+                _manager = False
                 _active = "N"
 
                 ## Validate if _query present
@@ -890,10 +890,10 @@ def tenantUser():
                     _parameters = Helpers.splitParams(_query)
                     ## if limit param present set the limit value
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
-                    ## if username param present, set the owner param
-                    _owner = str(_parameters['owner']) if 'owner' in _parameters else _owner
+                    ## if tenant param present, set the owner param
+                    _tenant = str(_parameters['tenant']) if 'tenant' in _parameters else _tenant
                     ## if shortCode param present, set the shortCode param
-                    _shortCode = str(_parameters['shortCode']) if 'shortCode' in _parameters else _shortCode
+                    _manager = str(_parameters['manager']) if 'manager' in _parameters else _manager
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -901,23 +901,23 @@ def tenantUser():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
-                elif _shortCode: 
+                    _search = _tnun_exist.where(filter=FieldFilter("Id", "==", _id))
+                elif _manager: 
                     ## the case of shortCode is present wull search for it.
-                    _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
-                elif _owner:
+                    _search = _tnun_exist.where(filter=FieldFilter("manager", "==", _manager))
+                elif _tenant:
                     ## The case username is present, will search with the specific username. 
-                    _search = wsp_ref.where(filter=FieldFilter("Owner", "==", _owner))
+                    _search = _tnun_exist.where(filter=FieldFilter("tenant", "==", _tenant))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
-                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _active))
+                    _search = _tnun_exist.where(filter=FieldFilter("Active", "==", _active))
                 else:
                     ## In case any param was present, will search all
-                    _search = wsp_ref
+                    _search = _tnun_exist
                 ## Loop in all the users inside the users_ref object
                 for _ws in _search.stream():
                     ## set the temporal json_blocl
@@ -927,7 +927,7 @@ def tenantUser():
                     ## Add a +1 to the count
                     _count += 1
                     ## Iterates into the _user_fields object to generate the json object for that user.
-                    for _x in _ws_fields:
+                    for _x in req_fields:
                         ## Generates the json object.
                         _json_block_l[_x] = _acc[_x]
                     ## Each iteration, append the user block to the main payload.
