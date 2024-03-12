@@ -740,7 +740,7 @@ def workspace():
 @app.route('/tenantUser', methods=['GET','POST','UPDATE','DELETE'])
 def tenantUser():
     try:
-        ## Method: POST /workspace
+        ## Method: POST /tenantUser
         if request.method == 'POST':
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
@@ -752,7 +752,7 @@ def tenantUser():
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
             if _auth:
-                ## Look for the workspace to exist.
+                ## Look for the tenantUser to exist.
                 if 'Id' in request.json:
                     ## Search for a wsp with that TaxId
                     _tnun_exist = tentus_ref.document(request.json['Id']).get()
@@ -779,9 +779,9 @@ def tenantUser():
                             ## update _json_payload object adding current field.
                             _json_payload.update({req_value: request.json[req_value]})
                         _json_payload.update({"Active": True})
-                        # create workspace.
+                        # create tenantUser.
                         try:
-                            ## Call to create the workspace.
+                            ## Call to create the tenantUser.
                             tentus_ref.document(request.json['Id']).set(_json_payload)
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
@@ -794,11 +794,11 @@ def tenantUser():
                         return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
                 else: 
                     ## In case ws TaxId is already registered, will trwo a 403 error.
-                    return jsonify({"status": "Error", "code": 403, "reason": "Workspace TaxId already registered."}), 403
+                    return jsonify({"status": "Error", "code": 403, "reason": "tenantUser TaxId already registered."}), 403
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
-        ## Method: PUT /workspace
+        ## Method: PUT /tenantUser
         elif request.method == 'PUT':
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
@@ -810,16 +810,16 @@ def tenantUser():
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
             if _auth:
-                ## Look for the workspace to exist.
+                ## Look for the tenantUser to exist.
                 if 'Id' in request.json and 'Tenant' in request.json:
                     ## Search for a wsp with that TaxId
-                    _wsp_exist = wsp_ref.document(request.json['Id'])
+                    _tnun_exist = tentus_ref.document(request.json['Id'])
                     ## format the json object to get values from it
-                    _fs_user = _wsp_exist.get().to_dict()
-                    ## continue if a workspace with the taxId send already exist and the owner match.
-                    if _wsp_exist != None and _fs_user['Tenant'] == request.json['Tenant']:
-                        ## Creation of the optional fields that could be sent to update the workspace.
-                        _opt_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                    _fs_user = _tnun_exist.get().to_dict()
+                    ## continue if a tenantUser with the taxId send already exist and the owner match.
+                    if _tnun_exist != None and _fs_user['Tenant'] == request.json['Tenant']:
+                        ## Creation of the optional fields that could be sent to update the tenantUser.
+                        _opt_fields = ['Username', 'Password', 'FullName', 'Email', 'Manager', 'Type']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -836,29 +836,113 @@ def tenantUser():
                                 _go = True
                         if _go:
                             try:
-                                ## Call to create the workspace.
-                                _response = _wsp_exist.update(_json_payload)
+                                ## Call to create the tenantUser.
+                                _response = _tnun_exist.update(_json_payload)
                             except Exception as e:
                                 ## In case of an error updating the user, retrieve a error message.
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                             ## in case the ws is created, returns 200 abd the trxId 
-                            return jsonify({"status": "success", "code": 202, "reason": "Workspace updated succesfully.", "trxId": transactionPost(request.json['Owner'], False, 1, "Workspace Put")}), 202
+                            return jsonify({"status": "success", "code": 202, "reason": "tenantUser updated succesfully.", "trxId": transactionPost(request.json['Owner'], False, 1, "tenantUser Put")}), 202
                         else:
                             ## in case any required field is not present, will return a 400
                             return jsonify({"status": "Error", "code": 400, "reason": "No fields to be updated, review the request."}), 400
                     else:
                         ## In case ws TaxId is already registered, will trwo a 403 error.
-                        return jsonify({"status": "Error", "code": 403, "reason": "Workspace not found or Owner user does not match. Review the payload and try again."}), 403
+                        return jsonify({"status": "Error", "code": 403, "reason": "tenantUser not found or Owner user does not match. Review the payload and try again."}), 403
                 else:
                     ## in case any required field is not present, will return a 400
                     return jsonify({"status": "Error", "code": 400, "reason": "Review request payload"}), 400
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
-        ## Method: GET /workspace
+        ## Method: GET /tenantUser
         elif request.method == 'GET': 
-            return ""
+            ## Validate the required authentication headers are present
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                ## If validateSession return false, delete the session id.
+                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            else: 
+                ## Fixed to true to allow outside calls to log in to the system,
+                _auth = False
+            if _auth:
+                ## list all the values to be returned in the get object.
+                _ws_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                ### Set the base for the json block to be returned. Define the data index for the list of users
+                _json_data_block = {"items": []}
+                ## If query filter present in url params it will save it, else will set False.
+                _query = False if 'filter' not in request.args else request.args.get('filter')
+                ## If id filter present in url params it will save it, else will set false.
+                _id = False if 'id' not in request.args else request.args.get('id')
+                ## set default value for limit and count. 
+                _limit =  10 
+                _count = 0
+                _owner = False
+                _shortCode = False
+                _active = "N"
+
+                ## Validate if _query present
+                if _query:
+                    ## calls to splitParams sending the _query form the request. If query correct returns a 
+                    ## dictionary with the params as key value.
+                    _parameters = Helpers.splitParams(_query)
+                    ## if limit param present set the limit value
+                    _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
+                    ## if username param present, set the owner param
+                    _owner = str(_parameters['owner']) if 'owner' in _parameters else _owner
+                    ## if shortCode param present, set the shortCode param
+                    _shortCode = str(_parameters['shortCode']) if 'shortCode' in _parameters else _shortCode
+                    ## if active param present validates the str value, if true seet True, else set False. if not present, 
+                    ## sets _active to "N" to ignore the value
+                    if 'active' in _parameters:
+                        _active = True if str(_parameters['active']).lower() == 'true' else False
+                ## Validate the 4 possible combinations for the query of the users search
+                if _id:
+                    ## The case of id is present will search for that specific email
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                elif _shortCode: 
+                    ## the case of shortCode is present wull search for it.
+                    _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
+                elif _owner:
+                    ## The case username is present, will search with the specific username. 
+                    _search = wsp_ref.where(filter=FieldFilter("Owner", "==", _owner))
+                    if _active != "N":
+                        ## In case the _active param is present in valid fashion, will search for active or inactiv
+                        ## e users.
+                        _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                elif _active != "N":
+                    ## In case activate is present, will search for active or inactive users.
+                    _search = wsp_ref.where(filter=FieldFilter("Active", "==", _active))
+                else:
+                    ## In case any param was present, will search all
+                    _search = wsp_ref
+                ## Loop in all the users inside the users_ref object
+                for _ws in _search.stream():
+                    ## set the temporal json_blocl
+                    _json_block_l = {}
+                    ## apply the to_dict() to the current user to use their information.
+                    _acc = _ws.to_dict()
+                    ## Add a +1 to the count
+                    _count += 1
+                    ## Iterates into the _user_fields object to generate the json object for that user.
+                    for _x in _ws_fields:
+                        ## Generates the json object.
+                        _json_block_l[_x] = _acc[_x]
+                    ## Each iteration, append the user block to the main payload.
+                    _json_data_block["items"].append(_json_block_l)
+                    if _count+1 > _limit: break
+                ## Before return a response, adding parameters for the get.
+                _json_data_block["limit"] = _limit
+                _json_data_block["count"] = _count
+                ## In case count > 0 it returns True, else False.
+                _json_data_block["containsData"] = True if _count > 0 else False 
+                _json_data_block["query"] = _query
+                return jsonify(_json_data_block), 200
+            else:
+                ## Missing authorization headers.
+                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             return ""
