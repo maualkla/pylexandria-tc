@@ -607,8 +607,14 @@ def workspace():
                         _active = True if str(_parameters['active']).lower() == 'true' else False
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
-                    ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                    if _owner:
+                        ## Search by owner
+                        _search = wsp_ref.where(filter=FieldFilter("Owner", "==", _owner))
+                        ## Search by id
+                        _search = _search.where(filter=FieldFilter("TaxId", "==", _id))
+                    else:
+                        ## The case of id is present will search for that specific email
+                        _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
                 elif _shortCode: 
                     ## the case of shortCode is present wull search for it.
                     _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
@@ -904,12 +910,19 @@ def tenantUser():
                 if _id:
                     ## The case of id is present will search for that specific email
                     _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id))
+                    if _tenant:
+                        _search = _search.where(filter=FieldFilter("Tenanr", "==", _tenant))
+                        if _manager:
+                            _search = _search.where(filter=FieldFilter("Manager", "==", _manager))
+                    elif _manager:
+                        _search = _search.where(filter=FieldFilter("Manager", "==", _manager))
+
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
-                    _search = tentus_ref.where(filter=FieldFilter("manager", "==", _manager))
+                    _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
                 elif _tenant:
                     ## The case username is present, will search with the specific username. 
-                    _search = tentus_ref.where(filter=FieldFilter("tenant", "==", _tenant))
+                    _search = tentus_ref.where(filter=FieldFilter("Tenant", "==", _tenant))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
@@ -973,9 +986,9 @@ def tenantUser():
                     ## dictionary with the params as key value.
                     _parameters = Helpers.splitParams(_query)
                     ## if username param present, set the owner param
-                    _tenant = str(_parameters['tenant']) if 'tenant' in _parameters else _tenant
+                    _tenant = str(_parameters['Tenant']) if 'tenant' in _parameters else _tenant
                     ## if shortCode param present, set the shortCode param
-                    _manager = str(_parameters['manager']) if 'shortCode' in _parameters else _manager
+                    _manager = str(_parameters['Manager']) if 'shortCode' in _parameters else _manager
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
