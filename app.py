@@ -906,10 +906,10 @@ def tenantUser():
                     _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
-                    _search = tentus_ref.where(filter=FieldFilter("manager", "==", _manager))
+                    _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
                 elif _tenant:
                     ## The case username is present, will search with the specific username. 
-                    _search = tentus_ref.where(filter=FieldFilter("tenant", "==", _tenant))
+                    _search = tentus_ref.where(filter=FieldFilter("Tenant", "==", _tenant))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
