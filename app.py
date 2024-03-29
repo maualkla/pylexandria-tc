@@ -609,6 +609,8 @@ def workspace():
                 if _id:
                     ## The case of id is present will search for that specific email
                     _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                    if _owner:
+                        _search = _search.where(filter=FieldFilter("Owner", "==", _owner))
                 elif _shortCode: 
                     ## the case of shortCode is present wull search for it.
                     _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
@@ -623,6 +625,7 @@ def workspace():
                     ## In case activate is present, will search for active or inactive users.
                     _search = wsp_ref.where(filter=FieldFilter("Active", "==", _active))
                 else:
+                    print("general")
                     ## In case any param was present, will search all
                     _search = wsp_ref
                 ## Loop in all the users inside the users_ref object
@@ -646,6 +649,7 @@ def workspace():
                 ## In case count > 0 it returns True, else False.
                 _json_data_block["containsData"] = True if _count > 0 else False 
                 _json_data_block["query"] = _query
+                print(_json_data_block)
                 return jsonify(_json_data_block), 200
             else:
                 ## Missing authorization headers.
