@@ -835,7 +835,13 @@ def tenantUser():
                             ## In case required field in json payload 
                             if req_value in request.json:
                                 ## update _json_payload object adding current field.
-                                _json_payload.update({req_value: request.json[req_value]})
+                                if req_value != "Password": 
+                                    ## add regular field
+                                    _json_payload.update({req_value: request.json[req_value]})
+                                ## if password
+                                elif req_value == "Password":
+                                    ## set encoded password
+                                    _json_payload.update({req_value: encrypt(request.json[req_value])})
                                 ## update flag to update user
                                 _go = True
                         if _go:
@@ -873,9 +879,8 @@ def tenantUser():
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
             if _auth:
-                print(2)
                 ## list all the values to be returned in the get object.
-                req_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                req_fields = ['Username', 'Id', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
