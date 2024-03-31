@@ -817,7 +817,7 @@ def tenantUser():
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json and 'Tenant' in request.json:
                     ## Search for a wsp with that TaxId
-                    _tnun_exist = tentus_ref.document(request.json['id'])
+                    _tnun_exist = tentus_ref.document(request.json['Id'])
                     ## format the json object to get values from it
                     _fs_user = _tnun_exist.get().to_dict()
                     ## continue if a tenantUser with the taxId send already exist and the owner match.
