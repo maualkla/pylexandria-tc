@@ -847,7 +847,7 @@ def tenantUser():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                             ## in case the ws is created, returns 200 abd the trxId 
-                            return jsonify({"status": "success", "code": 202, "reason": "tenantUser updated succesfully.", "trxId": transactionPost(request.json['CreatedBy'], False, 1, "tenantUser Put")}), 202
+                            return jsonify({"status": "success", "code": 202, "reason": "tenantUser updated succesfully.", "trxId": transactionPost(request.json['currentUser'], False, 1, "tenantUser Put")}), 202
                         else:
                             ## in case any required field is not present, will return a 400
                             return jsonify({"status": "Error", "code": 400, "reason": "No fields to be updated, review the request."}), 400
