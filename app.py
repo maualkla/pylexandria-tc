@@ -225,7 +225,6 @@ def user():
                         return jsonify({"status": "Error", "code": 409, "reason": "Email already registered" }), 409
                 else: 
                     ## There are missing required fields.
-                    print(_validation_errors)
                     return jsonify({"status": "Error", "code": 403, "reason": "Missing required fields or Validation Error", "validation_errors": _validation_errors}), 403
             else: 
                 ## Missing authorization headers.
@@ -625,7 +624,6 @@ def workspace():
                     ## In case activate is present, will search for active or inactive users.
                     _search = wsp_ref.where(filter=FieldFilter("Active", "==", _active))
                 else:
-                    print("general")
                     ## In case any param was present, will search all
                     _search = wsp_ref
                 ## Loop in all the users inside the users_ref object
@@ -649,7 +647,6 @@ def workspace():
                 ## In case count > 0 it returns True, else False.
                 _json_data_block["containsData"] = True if _count > 0 else False 
                 _json_data_block["query"] = _query
-                print(_json_data_block)
                 return jsonify(_json_data_block), 200
             else:
                 ## Missing authorization headers.
@@ -1044,10 +1041,8 @@ def tenantUser():
 @app.route('/timeLog', methods=['GET','POST','PUT','DELETE'])
 def timeLog():
     try:
-        print("timelog")
         ## Method: POST /timeLog
         if request.method == 'POST':
-            print(1)
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
                 ## In case are present, call validate session. True if valid, else not valid. Fixed to true
@@ -1106,7 +1101,6 @@ def timeLog():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: PUT /timeLog
         elif request.method == 'PUT':
-            print(2)
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
                 ## In case are present, call validate session. True if valid, else not valid. Fixed to true
@@ -1165,8 +1159,6 @@ def timeLog():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /timeLog
         elif request.method == 'GET': 
-            print(3)
-            print("(!) >> GET /timeLog")
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
                 ## In case are present, call validate session. True if valid, else not valid. Fixed to true
@@ -1248,7 +1240,6 @@ def timeLog():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
-            print(4)
             _errors = 0
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
@@ -1610,7 +1601,6 @@ def authPost(_user, _ilimited):
             return tobj
         else: 
             _status =  {"status": "Error", "errorStatus": "An error ocurred while creating the token, try again."}
-            print(_status)
             return False
     except Exception as e:
         print ( "(!) Exception in function: authPost() ")
