@@ -778,7 +778,13 @@ def tenantUser():
                         ## Create a for loop addressing all the required fields
                         for req_value in req_fields:
                             ## update _json_payload object adding current field.
-                            _json_payload.update({req_value: request.json[req_value]})
+                            if req_value != "Password": 
+                                ## add regular field
+                                _json_payload.update({req_value: request.json[req_value]})
+                            ## if password
+                            elif req_value == "Password":
+                                ## set encoded password
+                                _json_payload.update({req_value: encrypt(request.json[req_value])})
                         _json_payload.update({"Active": True})
                         # create tenantUser.
                         try:
@@ -889,6 +895,7 @@ def tenantUser():
                 _count = 0
                 _tenant = False
                 _manager = False
+                _type = False
                 _active = "N"
 
                 ## Validate if _query present
@@ -902,6 +909,8 @@ def tenantUser():
                     _tenant = str(_parameters['tenant']) if 'tenant' in _parameters else _tenant
                     ## if shortCode param present, set the shortCode param
                     _manager = str(_parameters['manager']) if 'manager' in _parameters else _manager
+                    ## if type is present, set the type param
+                    _type = str(_parameters['type']) if 'type' in _parameters else _type
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -910,6 +919,8 @@ def tenantUser():
                 if _id:
                     ## The case of id is present will search for that specific email
                     _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id))
+                    if _type: 
+                        _search = _search.where(filter=FieldFilter("Type", "==", _type))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
                     _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
@@ -920,6 +931,9 @@ def tenantUser():
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                    ### filter current search by type
+                    if _type: 
+                        _search = _search.where(filter=FieldFilter("Type", "==", 1 if _type != 0 else 0))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = tentus_ref.where(filter=FieldFilter("Active", "==", _active))
