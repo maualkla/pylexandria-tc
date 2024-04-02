@@ -1498,7 +1498,7 @@ def transaction():
 @app.route('/')
 def status():
     local_ip = request.remote_addr
-    return "<html><head><title>Alexandria Status</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
+    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
 
 ## Encode token.
 @app.route('/encode', methods=['GET'])
