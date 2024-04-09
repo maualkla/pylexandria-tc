@@ -26,6 +26,7 @@ app.config.from_object(Config)
 
 ## Logging 
 logging = app.config['LOGGING']
+pk = app.config['PRIVATE_SERVICE_TOKEN']
 
 ## Initialize Firestone DB
 cred = credentials.Certificate('key.json')
@@ -648,7 +649,49 @@ def workspace():
                 _json_data_block["containsData"] = True if _count > 0 else False 
                 _json_data_block["query"] = _query
                 return jsonify(_json_data_block), 200
+            ## case where there is no authentication
             else:
+                ## seeks for the openData and the privateKey to allow to access the data.
+                if request.headers.get('openData') and request.headers.get('privateKey'):
+                    ## validates private key
+                    if request.headers.get('privateKey') == pk:
+                        ## search for the id
+                        _id = False if 'id' not in request.args else request.args.get('id')
+                        ## if id is present
+                        if _id:
+                            ## The case of id is present will search for that specific email
+                            _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                            ## list all the values to be returned in the get object.
+                            _ws_fields = ['TaxId', 'LegalName', 'InformalName', 'ShortCode', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor']
+                            ### Set the base for the json block to be returned. Define the data index for the list of users
+                            _json_data_block = {"items": []}
+                            _count = 0
+                            _limit = 1
+                            _query = ''
+                            for _ws in _search.stream():
+                                ## set the temporal json_blocl
+                                _json_block_l = {}
+                                ## apply the to_dict() to the current user to use their information.
+                                _acc = _ws.to_dict()
+                                ## Add a +1 to the count
+                                _count += 1
+                                ## Iterates into the _user_fields object to generate the json object for that user.
+                                for _x in _ws_fields:
+                                    ## Generates the json object.
+                                    _json_block_l[_x] = _acc[_x]
+                                ## Each iteration, append the user block to the main payload.
+                                _json_data_block["items"].append(_json_block_l)
+                                if _count+1 > _limit: break
+                            ## Before return a response, adding parameters for the get.
+                            _json_data_block["limit"] = _limit
+                            _json_data_block["count"] = _count
+                            ## In case count > 0 it returns True, else False.
+                            _json_data_block["containsData"] = True if _count > 0 else False 
+                            _json_data_block["query"] = _query
+                            return jsonify(_json_data_block), 200
+                        else:
+                            ## Missing authorization headers.
+                            return jsonify({"status": "Error", "code": 403, "reason": "Missing Parameter"}), 403
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
