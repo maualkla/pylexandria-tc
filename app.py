@@ -1101,16 +1101,9 @@ def timeLog():
         ## Method: POST /timeLog
         if request.method == 'POST':
             ## Look for the timeLog to exist.
-            if 'Id' in request.json:
-                ## Search for a wsp with that Id
-                _tlog_exist = timlg_ref.document(request.json['UserId']).get()
-                ## format the json object
-                _tlog_exist = _tlog_exist.to_dict()
-            ## If the wsp with that Id do not exists proceeeds, otherwise return a 403 http code.
-            if _tlog_exist == None:
+            if 'UserId' in request.json:
                 ## Validate required values, first creating a list of all required
-                req_fields = ['Active', 'Id', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
-                all_fields = ['Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
+                req_fields = ['Active', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
                 ## go and iterate to find all of them, if not _go will be false
                 _go = True
                 ## For Loop going for all the required fields.
@@ -1124,19 +1117,24 @@ def timeLog():
                     ## Load the json payload 
                     _json_payload = json.loads(_json_template)
                     ## Create a for loop addressing all the required fields
-                    for req_value in all_fields:
+                    for req_value in req_fields:
                         ## update _json_payload object adding current field.
                         if req_value in request.json: _json_payload.update({req_value: request.json[req_value]})
                     # create timeLog.
+                    from datetime import datetime
+                    _now = datetime.now()
+                    _dateGen = _now.strftime("%d%m%YH%M%S")
+                    _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
+                    _json_payload.update({'Id': _timelogId})
                     try:
                         ## Call to create the timeLog.
-                        timlg_ref.document(request.json['Id']).set(_json_payload)
+                        timlg_ref.document(_json_payload['Id']).set(_json_payload)
                     except Exception as e:
                         ## In case of an error updating the user, retrieve a error message.
                         print('(!) >> Handled external service exception: ' + str(e) )
                         return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
                     ## in case the ws is created, returns 200 abd the trxId 
-                    return jsonify({"status": "success", "code": 200, "reason": "timeLog created succesfully.", "trxId": transactionPost(request.json['UserId'],False, 1, "Time Log POST")}), 200
+                    return jsonify({"status": "success", "code": 200, "token": _timelogId}), 200
                 else:
                     ## in case any required field is not present, will return a 400
                     return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
