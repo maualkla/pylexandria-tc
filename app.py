@@ -89,7 +89,10 @@ def session():
                 ## Validating the values are there and are valid to proceed.
                 if _sess_params[0] and _sess_params[1] and _client['ip'] and _client['browser']:
                     ## Get user reference and seach for the user on the request.
-                    _user = users_ref.document(_sess_params[0]).get().to_dict()
+                    _usern = _sess_params[0]
+                    _usern = _usern.upper()
+                    print(_usern)
+                    _user = users_ref.document(_usern).get().to_dict()
                     ## if user not found, user will = None and will send 400 for security reasons, else it will continue
                     if _user != None:
                         ## The password gets encrypted and decoded. Then we delete the internal value of the password for security reasons
@@ -99,21 +102,21 @@ def session():
                         _fire = _user['pass'].decode('utf-8')
                         ## Generate the ID for this session.
                         _idg = Helpers.idGenerator(15)
-                        ## Validate if the pass is the same in the request as it is in the firebase_object
+                        ## Validate if the pas  s is the same in the request as it is in the firebase_object
                         if _requ == _fire:
                             ## Get the user token. In case exist it will retrieve the tokenId. Else return False.
-                            _token = authGet(_sess_params[0])
+                            _token = authGet(_usern)
                             ## Validate if valid token. is present. If not, generates a new token for the user.
                             if _token == False:  
                                 ## calls authPost sending user name and False. To generate a temporal token.
-                                _token = authPost(_sess_params[0], False)
+                                _token = authPost(_usern, False)
                             ## Generate the json object required to create the session object.
                             _session_json = {
                                 "clientIp" : _client['ip'],
                                 "clientVersion": _client['browser'],
                                 "id": _idg,
                                 "tokenId": _token['id'],
-                                "userId": _sess_params[0]
+                                "userId": _usern
                             }
                             try:
                                 ## Call to create the workspace.
@@ -123,7 +126,7 @@ def session():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Session object failed to be created."}), 500
                             ## In case session was created successflly returns trx code and session id
-                            return jsonify({"_session_id": _idg, "trxId": transactionPost(_sess_params[0], False, 1, "Session Post")}), 200
+                            return jsonify({"_session_id": _idg, "trxId": transactionPost(_usern, False, 1, "Session Post")}), 200
                         else:
                             ## in case passwords do not match
                             return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
@@ -205,7 +208,7 @@ def user():
                     ## if user == None means user is not yet created, so flow continues, else return 409 indicating email already registered.
                     if user == None:
                         ## get pass from payload and decode 64 and then encrypt
-                        _user_post_params = ['activate','username','bday','email','fname','phone','pin','plan','postalCode','terms','type', 'tenant']
+                        _user_post_params = ['activate','username','bday','fname','phone','pin','plan','postalCode','terms','type', 'tenant']
                         _pcode = request.json['pass']
                         _pwrd = encrypt(Helpers.b64Decode(_pcode))
                         _pcode = ""
@@ -214,8 +217,9 @@ def user():
                         for _x in _user_post_params:
                             _objpay[_x] = request.json[_x]
                         _objpay['pass'] = _pwrd
+                        _objpay['email'] = s_email.upper()
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
-                        if users_ref.document(s_email).set(_objpay):
+                        if users_ref.document(s_email.upper()).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
                             return jsonify({"code": 202, "trxId": transactionPost(s_email, False, 1, "User Post")}), 202
                         else:
@@ -332,7 +336,7 @@ def user():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id.upper()))
                 elif _username:
                     ## The case username is present, will search with the specific username. 
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
@@ -407,7 +411,7 @@ def user():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id.upper()))
                 elif _username:
                     ## The case username is present, will search with the specific username. 
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
@@ -489,7 +493,7 @@ def workspace():
                         # create workspace.
                         try:
                             ## Call to create the workspace.
-                            wsp_ref.document(request.json['TaxId']).set(_json_payload)
+                            wsp_ref.document(request.json['TaxId'].upper()).set(_json_payload)
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
@@ -608,7 +612,7 @@ def workspace():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
                     if _owner:
                         _search = _search.where(filter=FieldFilter("Owner", "==", _owner))
                 elif _shortCode: 
@@ -660,7 +664,7 @@ def workspace():
                         ## if id is present
                         if _id:
                             ## The case of id is present will search for that specific email
-                            _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                            _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
                             ## list all the values to be returned in the get object.
                             _ws_fields = ['TaxId', 'LegalName', 'InformalName', 'ShortCode', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor']
                             ### Set the base for the json block to be returned. Define the data index for the list of users
@@ -734,7 +738,7 @@ def workspace():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
                 elif _shortCode: 
                     ## the case of shortCode is present wull search for it.
                     _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
@@ -832,7 +836,7 @@ def tenantUser():
                         # create tenantUser.
                         try:
                             ## Call to create the tenantUser.
-                            tentus_ref.document(request.json['Id']).set(_json_payload)
+                            tentus_ref.document(request.json['Id'].upper()).set(_json_payload)
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
@@ -961,7 +965,7 @@ def tenantUser():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id))
+                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
                     if _type: 
                         _search = _search.where(filter=FieldFilter("Type", "==", _type))
                 elif _manager: 
@@ -1048,7 +1052,7 @@ def tenantUser():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id))
+                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
                     _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
@@ -1101,46 +1105,63 @@ def timeLog():
         ## Method: POST /timeLog
         if request.method == 'POST':
             ## Look for the timeLog to exist.
-            if 'UserId' in request.json:
-                ## Validate required values, first creating a list of all required
-                req_fields = ['Active', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
-                ## go and iterate to find all of them, if not _go will be false
-                _go = True
-                ## For Loop going for all the required fields.
-                for req_value in req_fields:
-                    ## if it is not in the parameters, set flag to false.
-                    if req_value not in request.json:
-                        _go = False
-                if _go:
-                    ## Create json template for the payload
-                    _json_template = '{ }'
-                    ## Load the json payload 
-                    _json_payload = json.loads(_json_template)
-                    ## Create a for loop addressing all the required fields
-                    for req_value in req_fields:
-                        ## update _json_payload object adding current field.
-                        if req_value in request.json: _json_payload.update({req_value: request.json[req_value]})
-                    # create timeLog.
-                    from datetime import datetime
-                    _now = datetime.now()
-                    _dateGen = _now.strftime("%d%m%YH%M%S")
-                    _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
-                    _json_payload.update({'Id': _timelogId})
-                    try:
-                        ## Call to create the timeLog.
-                        timlg_ref.document(_json_payload['Id']).set(_json_payload)
-                    except Exception as e:
-                        ## In case of an error updating the user, retrieve a error message.
-                        print('(!) >> Handled external service exception: ' + str(e) )
-                        return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
-                    ## in case the ws is created, returns 200 abd the trxId 
-                    return jsonify({"status": "success", "code": 200, "token": _timelogId}), 200
+            if 'requestString' in request.json and 'ip' in request.json and 'browser' in request.json :
+                _decoded_str = Helpers.b64Decode(request.json['requestString'])
+                ## spliting the string into the un [0] and pass [1]
+                _sess_params = _decoded_str.split("_")
+                ### get tuser data.
+                _tuser = tentus_ref.document(_sess_params[0].upper()).get().to_dict()
+                if _tuser != None:
+                    ## The password gets encrypted and decoded. Then we delete the internal value of the password for security reasons
+                    _requ = encrypt(_sess_params[1]).decode('utf-8')
+                    ## Get the firebase_response_user object. It also is decoded.
+                    _fire = _tuser['Password'].decode('utf-8')
+                    print(_requ)
+                    print(_fire)
+                    if _requ == _fire:
+                        ## Get the dates and times.
+                        from datetime import datetime
+                        _now = datetime.now()
+                        _dateGen = _now.strftime("%d%m%YH%M%S")
+                        _onlyTime = _now.strftime("H%M%S")
+                        _onlyDate = _now.strftime("%d%m%Y")
+                        ## print em'
+                        print("onlyDate")
+                        print(_onlyDate)
+                        print("Only time")
+                        print(_onlyTime)
+                        print(" both together.")
+                        print(_dateGen)
+                        ## Geneerate the json
+                        _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
+                        _json_template = {
+                            'Id': _timelogId,
+                            "UserUd": _sess_params[0],
+                            "Active": True,
+                            "OriginalStartDate": _onlyDate,
+                            "OriginalStartTime": _onlyTime,
+                            "Ip": request.json['ip'],
+                            "Browser": request.json['browser']
+                        }
+                        print(_json_template)
+                        try:
+                            ## Call to create the timeLog.
+                            timlg_ref.document(_timelogId).set(_json_payload)
+                        except Exception as e:
+                            ## In case of an error updating the user, retrieve a error message.
+                            print('(!) >> Handled external service exception: ' + str(e) )
+                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
+                        ## in case the ws is created, returns 200 abd the trxId 
+                        return jsonify({"status": "success", "code": 200, "token": _timelogId}), 200
+                    else:
+                        ## in case any required field is not present, will return a 400
+                        return jsonify({"status": "Error", "code": 401, "reason": "Incorrect Username or Password."}), 401
                 else:
-                    ## in case any required field is not present, will return a 400
-                    return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
+                    ## in case there is not registered user with the user id sent.
+                    return jsonify({"status": "Error", "code": 404, "reason": "User not found."}), 404
             else: 
                 ## In case ws Id is already registered, will trwo a 403 error.
-                return jsonify({"status": "Error", "code": 403, "reason": "timeLog Id already registered."}), 403
+                return jsonify({"status": "Error", "code": 400, "reason": "Missing required parameters."}), 400
         ## Method: PUT /timeLog
         elif request.method == 'PUT':
             ## Validate the required authentication headers are present
@@ -1241,7 +1262,7 @@ def timeLog():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id))
+                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
                 elif _UserId:
                     ## The case username is present, will search with the specific username. 
                     _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId))
@@ -1317,7 +1338,7 @@ def timeLog():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id))
+                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
                 elif _UserId:
                     ## The case username is present, will search with the specific username. 
                     _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId))
@@ -1404,7 +1425,7 @@ def transaction():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
+                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id.upper()))
                 elif _action: 
                     ## the case of shortCode is present wull search for it.
                     _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
@@ -1483,7 +1504,7 @@ def transaction():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
+                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id.upper()))
                 elif _action: 
                     ## the case of shortCode is present wull search for it.
                     _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
