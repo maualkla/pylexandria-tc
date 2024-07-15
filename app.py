@@ -826,8 +826,12 @@ def tenantUser():
                         for req_value in req_fields:
                             ## update _json_payload object adding current field.
                             if req_value != "Password": 
-                                ## add regular field
-                                _json_payload.update({req_value: request.json[req_value]})
+                                if req_value == 'Id':
+                                    ## set upper case id 
+                                    _json_payload.update({req_value: request.json[req_value].upper()})
+                                else: 
+                                    ## add regular field
+                                    _json_payload.update({req_value: request.json[req_value]})
                             ## if password
                             elif req_value == "Password":
                                 ## set encoded password
@@ -968,9 +972,13 @@ def tenantUser():
                     _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
                     if _type: 
                         _search = _search.where(filter=FieldFilter("Type", "==", _type))
+                    if _tenant: 
+                        _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
                     _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
+                    if _tenant: 
+                        _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
                 elif _tenant:
                     ## The case username is present, will search with the specific username. 
                     _search = tentus_ref.where(filter=FieldFilter("Tenant", "==", _tenant))
