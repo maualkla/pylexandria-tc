@@ -835,7 +835,9 @@ def tenantUser():
                             ## if password
                             elif req_value == "Password":
                                 ## set encoded password
-                                _json_payload.update({req_value: encrypt(request.json[req_value])})
+                                ##encrypt(Helpers.b64Decode(_pcode))
+                                print(request.json[req_value])
+                                _json_payload.update({req_value: encrypt(Helpers.b64Decode(request.json[req_value]))})
                         _json_payload.update({"Active": True})
                         # create tenantUser.
                         try:
@@ -1118,6 +1120,8 @@ def timeLog():
                 ## spliting the string into the un [0] and pass [1]
                 _sess_params = _decoded_str.split("_")
                 ### get tuser data.
+                print('---------')
+                print(_sess_params)
                 _tuser = tentus_ref.document(_sess_params[0].upper()).get().to_dict()
                 if _tuser != None:
                     ## The password gets encrypted and decoded. Then we delete the internal value of the password for security reasons
@@ -1131,7 +1135,7 @@ def timeLog():
                         from datetime import datetime
                         _now = datetime.now()
                         _dateGen = _now.strftime("%d%m%YH%M%S")
-                        _onlyTime = _now.strftime("H%M%S")
+                        _onlyTime = _now.strftime("%H:%M:%S")
                         _onlyDate = _now.strftime("%d%m%Y")
                         ## print em'
                         print("onlyDate")
@@ -1144,7 +1148,7 @@ def timeLog():
                         _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
                         _json_template = {
                             'Id': _timelogId,
-                            "UserUd": _sess_params[0],
+                            "UserUd": _sess_params[0].upper(),
                             "Active": True,
                             "OriginalStartDate": _onlyDate,
                             "OriginalStartTime": _onlyTime,
@@ -1154,13 +1158,13 @@ def timeLog():
                         print(_json_template)
                         try:
                             ## Call to create the timeLog.
-                            timlg_ref.document(_timelogId).set(_json_payload)
+                            timlg_ref.document(_timelogId).set(_json_template)
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
                             return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
                         ## in case the ws is created, returns 200 abd the trxId 
-                        return jsonify({"status": "success", "code": 200, "token": _timelogId}), 200
+                        return jsonify({"status": "success", "code": 202, "token": _timelogId}), 202
                     else:
                         ## in case any required field is not present, will return a 400
                         return jsonify({"status": "Error", "code": 401, "reason": "Incorrect Username or Password."}), 401
