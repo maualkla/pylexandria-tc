@@ -1148,12 +1148,22 @@ def timeLog():
                         _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
                         _json_template = {
                             'Id': _timelogId,
-                            "UserUd": _sess_params[0].upper(),
+                            "UserId": _sess_params[0].upper(),
                             "Active": True,
                             "OriginalStartDate": _onlyDate,
                             "OriginalStartTime": _onlyTime,
                             "Ip": request.json['ip'],
-                            "Browser": request.json['browser']
+                            "Browser": request.json['browser'],
+                            "Edited": False,
+                            "EditedBy": False,
+                            "EditionDate": False,
+                            "EditionTime": False,
+                            "EndDate": False,
+                            "EndTime": False,
+                            "StartDate": False,
+                            "StartTime": False,
+                            "OriginalEndDate": False,
+                            "OriginalEndTime": False
                         }
                         print(_json_template)
                         try:
@@ -1243,9 +1253,9 @@ def timeLog():
             else: 
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
+            ## list all the values to be returned in the get object.
+            req_fields = ['Ip', 'Browser','Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']   
             if _auth:
-                ## list all the values to be returned in the get object.
-                req_fields = ['Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
                 ## Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -1274,7 +1284,7 @@ def timeLog():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
+                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id))
                 elif _UserId:
                     ## The case username is present, will search with the specific username. 
                     _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId))
@@ -1289,11 +1299,11 @@ def timeLog():
                     ## In case any param was present, will search all
                     _search = timlg_ref
                 ## Loop in all the users inside the users_ref object
-                for _ws in _search.stream():
+                for _tl in _search.stream():
                     ## set the temporal json_blocl
                     _json_block_l = {}
                     ## apply the to_dict() to the current user to use their information.
-                    _acc = _ws.to_dict()
+                    _acc = _tl.to_dict()
                     ## Add a +1 to the count
                     _count += 1
                     ## Iterates into the _user_fields object to generate the json object for that user.
@@ -1311,8 +1321,29 @@ def timeLog():
                 _json_data_block["query"] = _query
                 return jsonify(_json_data_block), 200
             else:
-                ## Missing authorization headers.
-                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+                if 'id' in request.args:
+                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", request.args.get('id')))
+                    _json_data_block = {"items": []}
+                    _count = 0
+                    for _tl in _search.stream():
+                        _json_block_l = {}
+                        _count += 1
+                        _acc = _tl.to_dict()
+                        for _x in req_fields:
+                            ## Generates the json object.
+                            _json_block_l[_x] = _acc[_x]
+                        _json_data_block["items"].append(_json_block_l)
+                        break
+                    ## Before return a response, adding parameters for the get.
+                    _json_data_block["limit"] = 1
+                    _json_data_block["count"] = _count
+                    ## In case count > 0 it returns True, else False.
+                    _json_data_block["containsData"] = True if _count > 0 else False 
+                    _json_data_block["query"] = False
+                    return jsonify(_json_data_block), 200
+                else:
+                    ## Missing authorization headers.
+                    return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
