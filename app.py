@@ -1120,61 +1120,69 @@ def timeLog():
                 ## spliting the string into the un [0] and pass [1]
                 _sess_params = _decoded_str.split("_")
                 ### get tuser data.
-                print('---------')
-                print(_sess_params)
                 _tuser = tentus_ref.document(_sess_params[0].upper()).get().to_dict()
                 if _tuser != None:
                     ## The password gets encrypted and decoded. Then we delete the internal value of the password for security reasons
                     _requ = encrypt(_sess_params[1]).decode('utf-8')
                     ## Get the firebase_response_user object. It also is decoded.
                     _fire = _tuser['Password'].decode('utf-8')
-                    print(_requ)
-                    print(_fire)
                     if _requ == _fire:
-                        ## Get the dates and times.
-                        from datetime import datetime
-                        _now = datetime.now()
-                        _dateGen = _now.strftime("%d%m%YH%M%S")
-                        _onlyTime = _now.strftime("%H:%M:%S")
-                        _onlyDate = _now.strftime("%d%m%Y")
-                        ## print em'
-                        print("onlyDate")
-                        print(_onlyDate)
-                        print("Only time")
-                        print(_onlyTime)
-                        print(" both together.")
-                        print(_dateGen)
-                        ## Geneerate the json
-                        _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
-                        _json_template = {
-                            'Id': _timelogId,
-                            "UserId": _sess_params[0].upper(),
-                            "Active": True,
-                            "OriginalStartDate": _onlyDate,
-                            "OriginalStartTime": _onlyTime,
-                            "Ip": request.json['ip'],
-                            "Browser": request.json['browser'],
-                            "Edited": False,
-                            "EditedBy": False,
-                            "EditionDate": False,
-                            "EditionTime": False,
-                            "EndDate": False,
-                            "EndTime": False,
-                            "StartDate": False,
-                            "StartTime": False,
-                            "OriginalEndDate": False,
-                            "OriginalEndTime": False
-                        }
-                        print(_json_template)
-                        try:
-                            ## Call to create the timeLog.
-                            timlg_ref.document(_timelogId).set(_json_template)
-                        except Exception as e:
-                            ## In case of an error updating the user, retrieve a error message.
-                            print('(!) >> Handled external service exception: ' + str(e) )
-                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
-                        ## in case the ws is created, returns 200 abd the trxId 
-                        return jsonify({"status": "success", "code": 202, "token": _timelogId}), 202
+                        ### Logic to retrieve the last timeLog from the user that was pending.
+                        ### this goes and search for all the user timeLogs and then, filter if any has a 
+                        ### endTime == False which means is pending, 
+                        ### it will retrieve only pending timeLogs till all of them are completed.
+                        _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _sess_params[0].upper()))
+                        _search = _search.where(filter=FieldFilter("EndTime", "==", False))
+                        req_fields = ['Ip', 'Browser','Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
+                        ## set the temporal json_blocl
+                        _json_block_l = {}
+                        for _tl in _search.stream():
+                            ## apply the to_dict() to the current user to use their information.
+                            _acc = _tl.to_dict()
+                            ## Iterates into the _user_fields object to generate the json object for that user.
+                            for _x in req_fields:
+                                ## Generates the json object.
+                                _json_block_l[_x] = _acc[_x]
+                            break
+                        if _json_block_l['Id']: 
+                            return jsonify({"status": "success", "code": 202, "token": _json_block_l['Id'], "trxId": transactionPost("System", False, 1, "timeLog RECOVERED - "+_sess_params[0].upper())}), 202
+                        else: 
+                            ## Get the dates and times.
+                            from datetime import datetime
+                            _now = datetime.now()
+                            _dateGen = _now.strftime("%d%m%YH%M%S")
+                            _onlyTime = _now.strftime("%H:%M:%S")
+                            _onlyDate = _now.strftime("%d.%m.%Y")
+                            ## Geneerate the json
+                            _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
+                            _json_template = {
+                                'Id': _timelogId,
+                                "UserId": _sess_params[0].upper(),
+                                "Active": True,
+                                "OriginalStartDate": _onlyDate,
+                                "OriginalStartTime": _onlyTime,
+                                "Ip": request.json['ip'],
+                                "Browser": request.json['browser'],
+                                "Edited": False,
+                                "EditedBy": False,
+                                "EditionDate": False,
+                                "EditionTime": False,
+                                "EndDate": False,
+                                "EndTime": False,
+                                "StartDate": False,
+                                "StartTime": False,
+                                "OriginalEndDate": False,
+                                "OriginalEndTime": False
+                            }
+                            try:
+                                ## Call to create the timeLog.
+                                timlg_ref.document(_timelogId).set(_json_template)
+                            except Exception as e:
+                                ## In case of an error updating the user, retrieve a error message.
+                                print('(!) >> Handled external service exception: ' + str(e) )
+                                return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
+                            ## in case the ws is created, returns 200 abd the trxId 
+                            return jsonify({"status": "success", "code": 202, "token": _timelogId, "trxId": transactionPost("System", False, 1, "timeLog POST - "+_sess_params[0].upper())}), 202
                     else:
                         ## in case any required field is not present, will return a 400
                         return jsonify({"status": "Error", "code": 401, "reason": "Incorrect Username or Password."}), 401
@@ -1187,23 +1195,20 @@ def timeLog():
         ## Method: PUT /timeLog
         elif request.method == 'PUT':
             ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            if 'Id' in request.json:
+                _auth = True
             else: 
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
             if _auth:
                 ## Look for the timeLog to exist.
-                if 'Id' in request.json and 'UserId' in request.json:
+                if 'Id' in request.json:
                     ## Search for a wsp with that Id
                     _tlog_exist = timlg_ref.document(request.json['Id'])
                     ## format the json object to get values from it
                     _fs_user = _tlog_exist.get().to_dict()
                     ## continue if a timeLog with the Id send already exist and the owner match.
-                    if _tlog_exist != None and _fs_user['UserId'] == request.json['UserId']:
+                    if _tlog_exist != None:
                         ## Creation of the optional fields that could be sent to update the timeLog.
                         req_fields = ['Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime',  'StartDate', 'StartTime']
                         ## define a flag to send or not the request.
@@ -1229,7 +1234,7 @@ def timeLog():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Time Log be updated."}), int(str(e)[0:3])
                             ## in case the ws is created, returns 200 abd the trxId 
-                            return jsonify({"status": "success", "code": 202, "reason": "timeLog updated succesfully.", "trxId": transactionPost(request.json['UserId'], False, 1, "timeLog Put")}), 202
+                            return jsonify({"status": "success", "code": 202, "reason": "timeLog updated succesfully.", "trxId": transactionPost("System", False, 1, "timeLog Put")}), 202
                         else:
                             ## in case any required field is not present, will return a 400
                             return jsonify({"status": "Error", "code": 400, "reason": "No fields to be updated, review the request."}), 400
@@ -1321,26 +1326,30 @@ def timeLog():
                 _json_data_block["query"] = _query
                 return jsonify(_json_data_block), 200
             else:
-                if 'id' in request.args:
-                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", request.args.get('id')))
-                    _json_data_block = {"items": []}
-                    _count = 0
-                    for _tl in _search.stream():
-                        _json_block_l = {}
-                        _count += 1
-                        _acc = _tl.to_dict()
-                        for _x in req_fields:
-                            ## Generates the json object.
-                            _json_block_l[_x] = _acc[_x]
-                        _json_data_block["items"].append(_json_block_l)
-                        break
-                    ## Before return a response, adding parameters for the get.
-                    _json_data_block["limit"] = 1
-                    _json_data_block["count"] = _count
-                    ## In case count > 0 it returns True, else False.
-                    _json_data_block["containsData"] = True if _count > 0 else False 
-                    _json_data_block["query"] = False
-                    return jsonify(_json_data_block), 200
+                if 'id' in request.args and request.headers.get('openData') and request.headers.get('privateKey'):
+                    if request.headers.get('privateKey') == pk:
+                        _search = timlg_ref.where(filter=FieldFilter("Id", "==", request.args.get('id')))
+                        _json_data_block = {"items": []}
+                        _count = 0
+                        for _tl in _search.stream():
+                            _json_block_l = {}
+                            _count += 1
+                            _acc = _tl.to_dict()
+                            for _x in req_fields:
+                                ## Generates the json object.
+                                _json_block_l[_x] = _acc[_x]
+                            _json_data_block["items"].append(_json_block_l)
+                            break
+                        ## Before return a response, adding parameters for the get.
+                        _json_data_block["limit"] = 1
+                        _json_data_block["count"] = _count
+                        ## In case count > 0 it returns True, else False.
+                        _json_data_block["containsData"] = True if _count > 0 else False 
+                        _json_data_block["query"] = False
+                        return jsonify(_json_data_block), 200
+                    else: 
+                        ## Missing authorization headers.
+                        return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
                 else:
                     ## Missing authorization headers.
                     return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
