@@ -1330,9 +1330,17 @@ def timeLog():
                         ## e users.
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
                     if _endDate: 
-                        _search = _search.where(filter=FieldFilter("EndDate", ">", _endDate))
+                        from datetime import datetime
+                        date_format = "%d.%m.%Y"
+                        end_date_object = datetime.strptime(_endDate, date_format)
+                        _stmtp = end_date_object.timestamp()
+                        _search = _search.where(filter=FieldFilter("EndTimestamp", ">", _stmtp))
                     elif _startDate: 
-                        _search = _search.where(filter=FieldFilter("StartDate", ">", _startDate))
+                        from datetime import datetime
+                        date_format = "%d.%m.%Y"
+                        start_date_object = datetime.strptime(_startDate, date_format)
+                        _stmtp = start_date_object.timestamp()
+                        _search = _search.where(filter=FieldFilter("StartTimestamp", ">", _stmtp))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = timlg_ref.where(filter=FieldFilter("Active", "==", _active))
