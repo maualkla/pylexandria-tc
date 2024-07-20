@@ -1136,6 +1136,7 @@ def timeLog():
                         req_fields = ['Ip', 'Browser','Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
                         ## set the temporal json_blocl
                         _json_block_l = {}
+                        _go = False
                         for _tl in _search.stream():
                             ## apply the to_dict() to the current user to use their information.
                             _acc = _tl.to_dict()
@@ -1143,8 +1144,9 @@ def timeLog():
                             for _x in req_fields:
                                 ## Generates the json object.
                                 _json_block_l[_x] = _acc[_x]
+                                _go = True
                             break
-                        if _json_block_l['Id']: 
+                        if _go: 
                             return jsonify({"status": "success", "code": 202, "token": _json_block_l['Id'], "trxId": transactionPost("System", False, 1, "timeLog RECOVERED - "+_sess_params[0].upper())}), 202
                         else: 
                             ## Get the dates and times.
@@ -1167,8 +1169,10 @@ def timeLog():
                                 "EditedBy": False,
                                 "EditionDate": False,
                                 "EditionTime": False,
+                                "EndTimestamp": 0,
                                 "EndDate": False,
                                 "EndTime": False,
+                                "StartTimestamp":0,
                                 "StartDate": False,
                                 "StartTime": False,
                                 "OriginalEndDate": False,
@@ -1225,6 +1229,28 @@ def timeLog():
                                 _json_payload.update({req_value: request.json[req_value]})
                                 ## update flag to update user
                                 _go = True
+                        ### Setup the templates to get the start and enddates
+                        from datetime import datetime
+                        date_format = "%d.%m.%Y"
+                        time_format = "%H:%M:%S"
+                        ### in case the StartDate and Time is present, set the StartTimestamp
+                        if 'StartTime' in request.json and 'StartDate' in request.json:
+                            start_date_object = datetime.strptime(request.json['StartDate'], date_format)
+                            start_time_object = datetime.strptime(request.json['StartTime'], time_format)
+                            combined_start_datetime = datetime.combine(start_date_object.date(), start_time_object.time())
+                            seconds_start_dt = combined_start_datetime.timestamp()
+                            _json_payload.update({
+                                "StartTimestamp": seconds_start_dt
+                            })
+                        ### in case the EndDate and Time is present, set the EndTimestamp
+                        if 'EndDate' in request.json and 'EndTime' in request.json:
+                            end_date_object = datetime.strptime(request.json['EndDate'], date_format)
+                            end_time_object = datetime.strptime(request.json['EndTime'], time_format)
+                            combined_end_datetime = datetime.combine(end_date_object.date(), end_time_object.time())
+                            seconds_end_dt = combined_end_datetime.timestamp()
+                            _json_payload.update({
+                                "EndTimestamp":seconds_end_dt
+                            })
                         if _go:
                             try:
                                 ## Call to create the timeLog.
@@ -1272,6 +1298,8 @@ def timeLog():
                 _count = 0
                 _UserId = False
                 _active = "N"
+                _startDate = False
+                _endDate = False
 
                 ## Validate if _query present
                 if _query:
@@ -1282,6 +1310,10 @@ def timeLog():
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if UserId param present, set the owner param
                     _UserId = str(_parameters['UserId']) if 'UserId' in _parameters else _UserId
+                    ## if StartDate param present, set the enddate param
+                    _startDate = str(_parameters['StartDate']) if 'StartDate' in _parameters else _startDate
+                    ## if EndDate param present, set the enddate param
+                    _endDate = str(_parameters['EndDate']) if 'EndDate' in _parameters else _endDate
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -1297,6 +1329,10 @@ def timeLog():
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                    if _endDate: 
+                        _search = _search.where(filter=FieldFilter("EndDate", ">", _endDate))
+                    elif _startDate: 
+                        _search = _search.where(filter=FieldFilter("StartDate", ">", _startDate))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = timlg_ref.where(filter=FieldFilter("Active", "==", _active))
