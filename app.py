@@ -1322,24 +1322,6 @@ def timeLog():
                 if _id:
                     ## The case of id is present will search for that specific email
                     _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id))
-                    ## in case the request includes a enddate filter the starttimestamp to be minor than the enddate
-                    if _endDate: 
-                        from datetime import datetime
-                        date_format = "%d.%m.%Y"
-                        end_date_object = datetime.strptime(_endDate, date_format)
-                        _stmtp = end_date_object.timestamp()
-                        print("ed")
-                        print(_stmtp)
-                        _search = _search.where(filter=FieldFilter("StartTimestamp", "<", _stmtp))
-                    ## in a similar case, validates the start timestamp to be bigger than the start date in case this parameter is present.
-                    if _startDate: 
-                        from datetime import datetime
-                        date_format = "%d.%m.%Y"
-                        start_date_object = datetime.strptime(_startDate, date_format)
-                        _stmtp = start_date_object.timestamp()
-                        print("sd")
-                        print(_stmtp)
-                        _search = _search.where(filter=FieldFilter("StartTimestamp", ">", _stmtp))
                 elif _UserId:
                     ## The case username is present, will search with the specific username. 
                     _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId))
