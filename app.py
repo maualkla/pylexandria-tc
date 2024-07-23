@@ -897,7 +897,7 @@ def tenantUser():
                                 ## if password
                                 elif req_value == "Password":
                                     ## set encoded password
-                                    _json_payload.update({req_value: encrypt(request.json[req_value])})
+                                    _json_payload.update({req_value: encrypt(Helpers.b64Decode(request.json[req_value]))})
                                 ## update flag to update user
                                 _go = True
                         if _go:
@@ -1126,6 +1126,8 @@ def timeLog():
                     _requ = encrypt(_sess_params[1]).decode('utf-8')
                     ## Get the firebase_response_user object. It also is decoded.
                     _fire = _tuser['Password'].decode('utf-8')
+                    print(_requ)
+                    print(_fire)
                     if _requ == _fire:
                         ### Logic to retrieve the last timeLog from the user that was pending.
                         ### this goes and search for all the user timeLogs and then, filter if any has a 
