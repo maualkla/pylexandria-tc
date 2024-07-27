@@ -1206,6 +1206,8 @@ def timeLog():
             else: 
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
+            print(" timeLog PUT service")
+            print(_auth)
             if _auth:
                 ## Look for the timeLog to exist.
                 if 'Id' in request.json:
@@ -1442,10 +1444,10 @@ def timeLog():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
+                    _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id))
                 elif _UserId:
                     ## The case username is present, will search with the specific username. 
-                    _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId))
+                    _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId.upper()))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
