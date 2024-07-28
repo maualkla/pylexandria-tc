@@ -1206,8 +1206,6 @@ def timeLog():
             else: 
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
-            print(" timeLog PUT service")
-            print(_auth)
             if _auth:
                 ## Look for the timeLog to exist.
                 if 'Id' in request.json:
