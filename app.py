@@ -803,7 +803,7 @@ def tenantUser():
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json:
                     ## Search for a wsp with that TaxId
-                    _tnun_exist = tentus_ref.document(request.json['Id']).get()
+                    _tnun_exist = tentus_ref.document(request.json['Id'].upper()).get()
                     ## format the json object
                     _tnun_exist = _tnun_exist.to_dict()
                 ## If the wsp with that taxId do not exists proceeeds, otherwise return a 403 http code.
@@ -846,15 +846,15 @@ def tenantUser():
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
-                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "tenantUser cannot be updated."}), int(str(e)[0:3])
+                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                         ## in case the ws is created, returns 200 abd the trxId 
-                        return jsonify({"status": "success", "code": 200, "reason": "tenantUser created succesfully.", "trxId": transactionPost(request.json['CreatedBy'],False, 1, "Tenant User POST")}), 200
+                        return jsonify({"status": "success", "code": 200, "reason": "User created succesfully.", "trxId": transactionPost(request.json['CreatedBy'],False, 1, "Tenant User POST")}), 200
                     else:
                         ## in case any required field is not present, will return a 400
                         return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
                 else: 
                     ## In case ws TaxId is already registered, will trwo a 403 error.
-                    return jsonify({"status": "Error", "code": 403, "reason": "tenantUser TaxId already registered."}), 403
+                    return jsonify({"status": "Error", "code": 403, "reason": "Username already registered."}), 403
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
