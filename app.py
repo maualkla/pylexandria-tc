@@ -2,8 +2,8 @@
 ## Pylexandria Project.
 ## Coded by: Mauricio Alcala (@maualkla)
 ## Creation Date: May 2023.
-## Current Version: 0.02
-## Last Modification Date: feb 2024.
+## Current Version: 0.04
+## Last Modification Date: Aug 2024.
 ## More info at @intmau in twitter or in http://maualkla.com
 ## Description: API for the services required by the adminde-tc proyect.
 
@@ -91,7 +91,7 @@ def session():
                     ## Get user reference and seach for the user on the request.
                     _usern = _sess_params[0]
                     _usern = _usern.upper()
-                    print(_usern)
+                    if logging: print(_usern)
                     _user = users_ref.document(_usern).get().to_dict()
                     ## if user not found, user will = None and will send 400 for security reasons, else it will continue
                     if _user != None:
@@ -803,7 +803,7 @@ def tenantUser():
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json:
                     ## Search for a wsp with that TaxId
-                    _tnun_exist = tentus_ref.document(request.json['Id']).get()
+                    _tnun_exist = tentus_ref.document(request.json['Id'].upper()).get()
                     ## format the json object
                     _tnun_exist = _tnun_exist.to_dict()
                 ## If the wsp with that taxId do not exists proceeeds, otherwise return a 403 http code.
@@ -836,7 +836,7 @@ def tenantUser():
                             elif req_value == "Password":
                                 ## set encoded password
                                 ##encrypt(Helpers.b64Decode(_pcode))
-                                print(request.json[req_value])
+                                if logging: print(request.json[req_value])
                                 _json_payload.update({req_value: encrypt(Helpers.b64Decode(request.json[req_value]))})
                         _json_payload.update({"Active": True})
                         # create tenantUser.
@@ -846,15 +846,15 @@ def tenantUser():
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
-                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "tenantUser cannot be updated."}), int(str(e)[0:3])
+                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                         ## in case the ws is created, returns 200 abd the trxId 
-                        return jsonify({"status": "success", "code": 200, "reason": "tenantUser created succesfully.", "trxId": transactionPost(request.json['CreatedBy'],False, 1, "Tenant User POST")}), 200
+                        return jsonify({"status": "success", "code": 200, "reason": "User created succesfully.", "trxId": transactionPost(request.json['CreatedBy'],False, 1, "Tenant User POST")}), 200
                     else:
                         ## in case any required field is not present, will return a 400
                         return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
                 else: 
                     ## In case ws TaxId is already registered, will trwo a 403 error.
-                    return jsonify({"status": "Error", "code": 403, "reason": "tenantUser TaxId already registered."}), 403
+                    return jsonify({"status": "Error", "code": 403, "reason": "Username already registered."}), 403
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
@@ -924,7 +924,7 @@ def tenantUser():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /tenantUser
         elif request.method == 'GET': 
-            print("(!) >> GET /tenantUser")
+            if logging: print("(!) >> GET /tenantUser")
             ## Validate the required authentication headers are present
             if request.headers.get('SessionId') and request.headers.get('TokenId'):
                 ## In case are present, call validate session. True if valid, else not valid. Fixed to true
@@ -1126,8 +1126,9 @@ def timeLog():
                     _requ = encrypt(_sess_params[1]).decode('utf-8')
                     ## Get the firebase_response_user object. It also is decoded.
                     _fire = _tuser['Password'].decode('utf-8')
-                    print(_requ)
-                    print(_fire)
+                    if logging:
+                        print(_requ)
+                        print(_fire)
                     if _requ == _fire:
                         ### Logic to retrieve the last timeLog from the user that was pending.
                         ### this goes and search for all the user timeLogs and then, filter if any has a 
@@ -1337,8 +1338,9 @@ def timeLog():
                         date_format = "%d.%m.%Y"
                         end_date_object = datetime.strptime(_endDate, date_format)
                         _stmtp = end_date_object.timestamp()
-                        print("ed")
-                        print(_stmtp)
+                        if logging:
+                            print("ed")
+                            print(_stmtp)
                         _search = _search.where(filter=FieldFilter("StartTimestamp", "<", _stmtp))
                     ## in a similar case, validates the start timestamp to be bigger than the start date in case this parameter is present.
                     if _startDate: 
@@ -1346,8 +1348,9 @@ def timeLog():
                         date_format = "%d.%m.%Y"
                         start_date_object = datetime.strptime(_startDate, date_format)
                         _stmtp = start_date_object.timestamp()
-                        print("sd")
-                        print(_stmtp)
+                        if logging: 
+                            print("sd")
+                            print(_stmtp)
                         _search = _search.where(filter=FieldFilter("StartTimestamp", ">", _stmtp))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
@@ -1676,7 +1679,7 @@ def encode():
 ## _un: (optional) username of the user to delete
 def deleteUser(_id, _un):
     try:
-        print(" >> deleteUser() helper.")
+        if logging: print(" >> deleteUser("+_id+", "+_un+") helper.")
         deleteUserTokens(_id)
         deleteUserTrx(_id)
         if users_ref.document(_id).delete():
@@ -1693,7 +1696,7 @@ def deleteUser(_id, _un):
 ## _id: (required) id of the workspace to be deleted
 def deleteWorkspace(_id):
     try:
-        print(" >> deleteWorkspace() helper.")
+        if logging: print(" >> deleteWorkspace("+_id+") helper.")
         if wsp_ref.document(_id).delete():
             return True
         else: 
@@ -1708,7 +1711,7 @@ def deleteWorkspace(_id):
 ## _id: (required) id of the tenantUser to be deleted
 def tenantUserDelete(_id):
     try:
-        print(" >> tenantUserDelete() helper.")
+        if logging: print(" >> tenantUserDelete("+_id+") helper.")
         if tentus_ref.document(_id).delete():
             return True
         else: 
@@ -1723,7 +1726,7 @@ def tenantUserDelete(_id):
 ## _id: (required) id of the timeLog to be deleted
 def timeLogDelete(_id):
     try:
-        print(" >> timeLogDelete() helper.")
+        if logging: print(" >> timeLogDelete("+_id+") helper.")
         if timlg_ref.document(_id).delete():
             return True
         else: 
@@ -1741,7 +1744,7 @@ def timeLogDelete(_id):
 ## _ilimited: If true will set a timedelta of 180 days, else will be only for 72 hours.
 def authPost(_user, _ilimited):
     try:
-        print(" >> authPost() service.")
+        if logging: print(" >> authPost("+_user+", "+_ilimited+") service.")
         ## import datetime library
         from datetime import datetime, timedelta
         ## get current time
@@ -1779,7 +1782,7 @@ def authPost(_user, _ilimited):
 ## _user: User Email for the Token authorization.
 def authGet(_user):
     try:
-        print(" >> authGet() service.")
+        if logging: print(" >> authGet("+_user+") service.")
         ## search in firestore from tokens of currrent user
         _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _user))
         ## Set the tokens count to know how many tokens were processed.
@@ -1813,7 +1816,7 @@ def authGet(_user):
 ## _id: Token id to be deleted.
 def authDelete(_id):
     try:
-        print(" >> authDelete() service.")
+        if logging: print(" >> authDelete("+_id+") service.")
         ## Delete sessions related to token
         _sessions = sess_ref.where(filter=FieldFilter("tokenId", "==", _id))
         for _ses in _sessions.stream():
@@ -1834,7 +1837,7 @@ def authDelete(_id):
 ## _token: token id that wants to valdiate
 def tokenValidator(_user, _token):
     try:
-        print(" >> tokenValidator() helper.")
+        if logging: print(" >> tokenValidator("+_user+", "+_token+") helper.")
         from datetime import datetime
         current_date_time = datetime.now()
         current_date_time = current_date_time.strftime("%d%m%YH%M%S")
@@ -1861,7 +1864,7 @@ def tokenValidator(_user, _token):
 ## auth (DELETE ALL USER TOKENS)
 ## _un: (required) Username that want to delete all tokens of.
 def deleteUserTokens(_un):
-    print(" >> deleteUserTokens() helper.")
+    if logging: print(" >> deleteUserTokens("+_un+") helper.")
     ## search in firestore from tokens of currrent user
     _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _un))
     ## Set the tokens count to know how many tokens were deleted.
@@ -1879,7 +1882,7 @@ def deleteUserTokens(_un):
 ## _id: (required) id of the session object want to delete.
 def deleteSession(_id):
     try:
-        print(" >> deleteSession() helper.")
+        if logging: print(" >> deleteSession("+_id+") helper.")
         if sess_ref.document(_id).delete():
             return True
         else: 
@@ -1895,7 +1898,7 @@ def deleteSession(_id):
 ## _token: (required) token id vant to match.
 def validateSession(_id, _tokenid):
     try:
-        print(" >> validateSession() helper.")
+        if logging: print(" >> validateSession("+_id+", "+_tokenid+") helper.")
         _sess = sess_ref.document(_id).get()        
         if _sess != None:
             _dicted = _sess.to_dict()
@@ -1919,7 +1922,7 @@ def validateSession(_id, _tokenid):
 ## _action: The name of the action that is generated the transaction for.
 def transactionPost(_userId, _alert, _severity, _action):
     try:
-        print(" >> transactionPost() helper.")
+        if logging: print(" >> transactionPost("+_userId+", "+_alert+", "+_severity+", "+_action+") helper.")
         from datetime import datetime
         _now = datetime.now()
         _dateGen = _now.strftime("%d%m%YH%M%S")
@@ -1946,7 +1949,7 @@ def transactionPost(_userId, _alert, _severity, _action):
 ## _transaction_id: Number of the transaction.
 def transactionDelete(_transaction_id):
     try:
-        print(" >> deleteTransaction() helper.")
+        if logging: print(" >> deleteTransaction("+_transaction_id+") helper.")
         if trx_ref.document(_transaction_id).delete():
             return True
         else: 
@@ -1961,7 +1964,7 @@ def transactionDelete(_transaction_id):
 ## _transaction_id: Number of the transaction.
 def deleteUserTrx(_userId):
     try:
-        print(" >> deleteUserTrx() helper.")
+        if logging: print(" >> deleteUserTrx("+_userId+") helper.")
         ## search in firestore from tokens of currrent user
         _trx = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
         ## Set the tokens count to know how many tokens were deleted.
@@ -1984,7 +1987,7 @@ def deleteUserTrx(_userId):
 ## Encrypt
 def encrypt(_string):
     try:    
-        print(" >> encrypt() helper.")
+        if logging: print(" >> encrypt("+_string+") helper.")
         bc_salt = app.config['CONF_SALT_KEY']
         salt = bc_salt.encode('utf-8')
         bytes_pwd = _string.encode('utf-8')
