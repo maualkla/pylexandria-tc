@@ -1452,6 +1452,7 @@ def transaction():
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
+            count = 0
             _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
@@ -1482,7 +1483,7 @@ def transaction():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id.upper()))
+                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
                 elif _action: 
                     ## the case of shortCode is present wull search for it.
                     _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
@@ -1491,7 +1492,7 @@ def transaction():
                     _search = trx_ref.where(filter=FieldFilter("alert", "==", _alert))
                 elif _userId:
                     ## In case activate is present, will search for active or inactive users.
-                    _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
+                    _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId.upper()))
                 else:
                     ## In case any param was present, will search all
                     _search = trx_ref
@@ -1504,14 +1505,15 @@ def transaction():
                     ## validate if deletion was successful
                     if transactionDelete(_acc['id']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['id']] = transactionPost(_auth['userId'], False, 3, "Transaction Delete")
+                        ## _trx[_acc['id']] = transactionPost(_auth['userId'], False, 3, "Transaction Delete")
+                        count += 1
                     else:
                         ## Sums error count
                         _errors += 1
                 ## validated the numer of errors
                 if _errors == 0:
                     ## if no errors returns only the trx 
-                    return jsonify(_trx), 200
+                    return jsonify({"count": count}), 200
                 else:
                     ## if errors, returns the error count and the trx successful
                     return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deleting", "errorCount": _errors, "transactions": [_trx]}), 401
@@ -1519,6 +1521,8 @@ def transaction():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print (e)
+        ## in case of error prints the exception and the code.
         return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
 
 ## API Status
@@ -1815,9 +1819,11 @@ def transactionPost(_userId, _alert, _severity, _action):
         if logging: print(" >> transactionPost("+_userId+", "+str(_alert)+", "+str(_severity)+", "+str(_action)+") helper.")
         _now = datetime.now()
         _dateGen = _now.strftime("%d%m%YH%M%S")
+        _onlyTime = _now.strftime("%H:%M:%S")
+        _onlyDate = _now.strftime("%d.%m.%Y")
         _trxId = Helpers.randomString(4) + _dateGen + Helpers.randomString(20)
         _trx_obj = {
-            "dateTime" : _dateGen,
+            "dateTime" : _onlyDate+" "+_onlyTime,
             "userId" : _userId,
             "id": _trxId,
             "alert": _alert if _alert else False,
