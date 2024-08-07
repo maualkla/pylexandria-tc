@@ -11,6 +11,7 @@
 from flask import Flask, jsonify, request
 from firebase_admin import credentials, firestore, initialize_app
 from google.cloud.firestore_v1.base_query import FieldFilter
+from datetime import datetime,timedelta
 from config import Config
 from utilities.helpers import Helpers
 import rsa, bcrypt, base64, json
@@ -165,14 +166,7 @@ def user():
     try:
         ## Method: POST /user
         if request.method == 'POST':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                ## for the use case where we should allow all request to create a new user.
-                _auth = True ##validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = True
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Validate required values, first creating a list of all required
                 req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
@@ -236,14 +230,7 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
-            ## Validate if the headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## If headers present, call to validateSession to know if it is a valid authorization,
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## validate minimum characters.
                 if 'email' in request.json:
@@ -297,15 +284,7 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /user
         elif request.method == 'GET': 
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
@@ -378,15 +357,7 @@ def user():
         ## user Delete service
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -453,15 +424,7 @@ def workspace():
     try:
         ## Method: POST /workspace
         if request.method == 'POST':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the workspace to exist.
                 if 'TaxId' in request.json:
@@ -511,15 +474,7 @@ def workspace():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: PUT /workspace
         elif request.method == 'PUT':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the workspace to exist.
                 if 'TaxId' in request.json and 'Owner' in request.json:
@@ -568,16 +523,8 @@ def workspace():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /workspace
-        elif request.method == 'GET': 
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+        elif request.method == 'GET':
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 _ws_fields = ['Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
@@ -701,15 +648,7 @@ def workspace():
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -790,15 +729,7 @@ def tenantUser():
     try:
         ## Method: POST /tenantUser
         if request.method == 'POST':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json:
@@ -860,15 +791,7 @@ def tenantUser():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: PUT /tenantUser
         elif request.method == 'PUT':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json and 'Tenant' in request.json:
@@ -925,15 +848,7 @@ def tenantUser():
         ## Method: GET /tenantUser
         elif request.method == 'GET': 
             if logging: print("(!) >> GET /tenantUser")
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 req_fields = ['Username', 'Id', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
@@ -1025,15 +940,7 @@ def tenantUser():
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -1153,7 +1060,6 @@ def timeLog():
                             return jsonify({"status": "success", "code": 202, "token": _json_block_l['Id'], "trxId": transactionPost("System", False, 1, "timeLog RECOVERED - "+_sess_params[0].upper())}), 202
                         else: 
                             ## Get the dates and times.
-                            from datetime import datetime
                             _now = datetime.now()
                             _dateGen = _now.strftime("%d%m%YH%M%S")
                             _onlyTime = _now.strftime("%H:%M:%S")
@@ -1233,7 +1139,7 @@ def timeLog():
                                 ## update flag to update user
                                 _go = True
                         ### Setup the templates to get the start and enddates
-                        from datetime import datetime
+                        
                         date_format = "%d.%m.%Y"
                         time_format = "%H:%M:%S"
                         ### in case the StartDate and Time is present, set the StartTimestamp
@@ -1278,15 +1184,7 @@ def timeLog():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /timeLog
         elif request.method == 'GET': 
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             ## list all the values to be returned in the get object.
             req_fields = ['Ip', 'Browser','Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']   
             if _auth:
@@ -1334,7 +1232,6 @@ def timeLog():
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
                     ## in case the request includes a enddate filter the starttimestamp to be minor than the enddate
                     if _endDate: 
-                        from datetime import datetime
                         date_format = "%d.%m.%Y"
                         end_date_object = datetime.strptime(_endDate, date_format)
                         _stmtp = end_date_object.timestamp()
@@ -1344,7 +1241,6 @@ def timeLog():
                         _search = _search.where(filter=FieldFilter("StartTimestamp", "<", _stmtp))
                     ## in a similar case, validates the start timestamp to be bigger than the start date in case this parameter is present.
                     if _startDate: 
-                        from datetime import datetime
                         date_format = "%d.%m.%Y"
                         start_date_object = datetime.strptime(_startDate, date_format)
                         _stmtp = start_date_object.timestamp()
@@ -1411,15 +1307,7 @@ def timeLog():
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -1490,15 +1378,7 @@ def transaction():
     try:
         ## Method: GET /transaction
         if request.method == 'GET':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 _trx_fields = ['dateTime','id','userId','alert','action','severity'] 
@@ -1528,7 +1408,6 @@ def transaction():
                     _userId = str(_parameters['userId']) if 'userId' in _parameters else _userId
                     if 'alert' in _parameters:
                         _alert = True if str(_parameters['alert']).lower() == 'true' else False
-
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
@@ -1573,15 +1452,7 @@ def transaction():
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -1736,7 +1607,28 @@ def timeLogDelete(_id):
         print (e)
         return False
     
-
+## common authentication
+## commonAuthProcess ()
+## requestObjt
+def commonAuthValidation(request, type = False):
+    try:
+        if logging: print(" >> commonAuthValidation( request object, complete = "+str(type)+") helper.")
+        if request and type == False:
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                if _auth == False: 
+                    deleteSession(request.headers.get('SessionId'))
+                return _auth
+            else:
+                return False
+        elif request and type:
+            return False
+        else:
+            return False
+    except Exception as e:
+        print (e)
+        ## in case of error prints the exception and the code.
+        return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
 ## Auth POST Service
 ## auth (POST)
@@ -1744,9 +1636,8 @@ def timeLogDelete(_id):
 ## _ilimited: If true will set a timedelta of 180 days, else will be only for 72 hours.
 def authPost(_user, _ilimited):
     try:
-        if logging: print(" >> authPost("+_user+", "+_ilimited+") service.")
-        ## import datetime library
-        from datetime import datetime, timedelta
+        if logging: print(" >> authPost("+_user+", "+str(_ilimited)+") service.")
+        ## import datetime library 
         ## get current time
         current_date_time = datetime.now()
         ## generates string for the token
@@ -1838,7 +1729,6 @@ def authDelete(_id):
 def tokenValidator(_user, _token):
     try:
         if logging: print(" >> tokenValidator("+_user+", "+_token+") helper.")
-        from datetime import datetime
         current_date_time = datetime.now()
         current_date_time = current_date_time.strftime("%d%m%YH%M%S")
         new_current_date_time = datetime.strptime(current_date_time, '%d%m%YH%M%S')
@@ -1922,8 +1812,7 @@ def validateSession(_id, _tokenid):
 ## _action: The name of the action that is generated the transaction for.
 def transactionPost(_userId, _alert, _severity, _action):
     try:
-        if logging: print(" >> transactionPost("+_userId+", "+_alert+", "+_severity+", "+_action+") helper.")
-        from datetime import datetime
+        if logging: print(" >> transactionPost("+_userId+", "+str(_alert)+", "+str(_severity)+", "+str(_action)+") helper.")
         _now = datetime.now()
         _dateGen = _now.strftime("%d%m%YH%M%S")
         _trxId = Helpers.randomString(4) + _dateGen + Helpers.randomString(20)
