@@ -415,6 +415,7 @@ def user():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
@@ -719,6 +720,7 @@ def workspace():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
@@ -996,7 +998,7 @@ def tenantUser():
                     ## validate if deletion was successful
                     if tenantUserDelete(_acc['Id']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['Id']] = transactionPost(_auth['CreatedBy'], False, 2, "TenantUser Delete")
+                        _trx[_acc['Id']] = transactionPost(_auth['userId'], False, 3, "TenantUser ("+_id+") Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -1011,6 +1013,7 @@ def tenantUser():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
@@ -1368,6 +1371,7 @@ def timeLog():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
@@ -1521,6 +1525,7 @@ def transaction():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
@@ -1563,6 +1568,7 @@ def deleteUser(_id, _un):
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteUser() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1578,6 +1584,7 @@ def deleteWorkspace(_id):
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteWorkspace() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1593,6 +1600,7 @@ def tenantUserDelete(_id):
             return False
     except Exception as e:
         print ( "(!) Exception in function: tenantUserDelete() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1608,6 +1616,7 @@ def timeLogDelete(_id):
             return False
     except Exception as e:
         print ( "(!) Exception in function: timeLogDelete() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1630,6 +1639,7 @@ def commonAuthValidation(request, type = False):
         else:
             return False
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
@@ -1669,6 +1679,7 @@ def authPost(_user, _ilimited):
             return False
     except Exception as e:
         print ( "(!) Exception in function: authPost() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1703,6 +1714,7 @@ def authGet(_user):
             return False
     except Exception as e:
         print ( "(!) Exception in function: authGet() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1722,6 +1734,7 @@ def authDelete(_id):
             return False
     except Exception as e:
         print ( "(!) Exception in function: authDelete() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1783,6 +1796,7 @@ def deleteSession(_id):
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteSession() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1804,6 +1818,7 @@ def validateSession(_id, _tokenid):
             return False
     except Exception as e:
         print ( "(!) Exception in function: validateSession() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1836,6 +1851,7 @@ def transactionPost(_userId, _alert, _severity, _action):
             return False
     except Exception as e:
         print ( "(!) Exception in function: transactionPost() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1851,6 +1867,7 @@ def transactionDelete(_transaction_id):
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteTransaction() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1872,6 +1889,7 @@ def deleteUserTrx(_userId):
         return _trx_count   
     except Exception as e:
         print ( "(!) Exception in function: deleteUserTrx() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1890,6 +1908,7 @@ def encrypt(_string):
         return hashed_pwd
     except Exception as e:
         print ( "(!) Exception in function: encrypt() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
