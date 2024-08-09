@@ -43,14 +43,14 @@ countries_ref = db.reference('countries')
 default_app = initialize_app(cred)
 """
 ## initialize firestore
-db1 = firestore.client()
-users_ref = db1.collection('users')
-tokens_ref = db1.collection('tokens')
-trx_ref = db1.collection('transactions')
-wsp_ref = db1.collection('workspaces')
-sess_ref = db1.collection('sessions')
-tentus_ref = db1.collection('tenantUser')
-timlg_ref = db1.collection('timeLog')
+fsc = firestore.client()
+users_ref = fsc.collection('users')
+tokens_ref = fsc.collection('tokens')
+trx_ref = fsc.collection('transactions')
+wsp_ref = fsc.collection('workspaces')
+sess_ref = fsc.collection('sessions')
+tentus_ref = fsc.collection('tenantUser')
+timlg_ref = fsc.collection('timeLog')
 
 
 
@@ -1566,12 +1566,10 @@ def encode():
 @app.route('/countries', methods=['GET'])
 def countries():
     try:
-        ## https://adminde-tc-default-rtdb.firebaseio.com/countries
         data = countries_ref.get()
-        print(data)
         return jsonify(data), 200
     except Exception as e:
-        return {"status": "An error Occurred", "error": str(e)}
+        return jsonify({"status": "An error Occurred", "error": str(e)}), 500
 
 ######################################################################
 ### Private Services  ################################################
