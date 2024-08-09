@@ -11,8 +11,7 @@
 from flask import Flask, jsonify, request
 from firebase_admin import credentials, firestore, initialize_app
 import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import db
+from firebase_admin import credentials, db
 from google.cloud.firestore_v1.base_query import FieldFilter
 from datetime import datetime,timedelta
 from config import Config
