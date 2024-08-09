@@ -10,11 +10,14 @@
 ## Imports
 from flask import Flask, jsonify, request
 from firebase_admin import credentials, firestore, initialize_app
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
 from google.cloud.firestore_v1.base_query import FieldFilter
 from datetime import datetime,timedelta
 from config import Config
 from utilities.helpers import Helpers
-import rsa, bcrypt, base64, json
+import rsa, bcrypt, json
 
 ## Initiate Public and private key
 publicKey, privateKey = rsa.newkeys(512)
@@ -29,17 +32,28 @@ app.config.from_object(Config)
 logging = app.config['LOGGING']
 pk = app.config['PRIVATE_SERVICE_TOKEN']
 
+## RealTime DB Firebase
+cred = credentials.Certificate('key.json') 
+firebase_admin.initialize_app(cred, {
+    'databaseURL':  app.config['FIREBASE_RTDB_URL']
+})
+countries_ref = db.reference('countries') 
+
+"""
 ## Initialize Firestone DB
-cred = credentials.Certificate('key.json')
 default_app = initialize_app(cred)
-db = firestore.client()
-users_ref = db.collection('users')
-tokens_ref = db.collection('tokens')
-trx_ref = db.collection('transactions')
-wsp_ref = db.collection('workspaces')
-sess_ref = db.collection('sessions')
-tentus_ref = db.collection('tenantUser')
-timlg_ref = db.collection('timeLog')
+"""
+## initialize firestore
+db1 = firestore.client()
+users_ref = db1.collection('users')
+tokens_ref = db1.collection('tokens')
+trx_ref = db1.collection('transactions')
+wsp_ref = db1.collection('workspaces')
+sess_ref = db1.collection('sessions')
+tentus_ref = db1.collection('tenantUser')
+timlg_ref = db1.collection('timeLog')
+
+
 
 ## Session Service
 @app.route('/session', methods=['GET', 'POST', 'DELETE'])
@@ -1546,6 +1560,17 @@ def encode():
             return jsonify({"status": "success", "original": _dec, "encoded": _b64}), 200
         else:
             return jsonify({"status", "error"}), 400
+    except Exception as e:
+        return {"status": "An error Occurred", "error": str(e)}
+
+## Countries API
+@app.route('/countries', methods=['GET'])
+def countries():
+    try:
+        ## https://adminde-tc-default-rtdb.firebaseio.com/countries
+        data = countries_ref.get()
+        print(data)
+        return jsonify(data), 200
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
 
