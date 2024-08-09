@@ -2,18 +2,21 @@
 ## Pylexandria Project.
 ## Coded by: Mauricio Alcala (@maualkla)
 ## Creation Date: May 2023.
-## Current Version: 0.02
-## Last Modification Date: feb 2024.
+## Current Version: 0.04
+## Last Modification Date: Aug 2024.
 ## More info at @intmau in twitter or in http://maualkla.com
 ## Description: API for the services required by the adminde-tc proyect.
 
 ## Imports
 from flask import Flask, jsonify, request
 from firebase_admin import credentials, firestore, initialize_app
+import firebase_admin
+from firebase_admin import credentials, db
 from google.cloud.firestore_v1.base_query import FieldFilter
+from datetime import datetime,timedelta
 from config import Config
 from utilities.helpers import Helpers
-import rsa, bcrypt, base64, json
+import rsa, bcrypt, json
 
 ## Initiate Public and private key
 publicKey, privateKey = rsa.newkeys(512)
@@ -26,18 +29,30 @@ app.config.from_object(Config)
 
 ## Logging 
 logging = app.config['LOGGING']
+pk = app.config['PRIVATE_SERVICE_TOKEN']
 
+## RealTime DB Firebase
+cred = credentials.Certificate('key.json') 
+firebase_admin.initialize_app(cred, {
+    'databaseURL':  app.config['FIREBASE_RTDB_URL']
+})
+countries_ref = db.reference('countries') 
+
+"""
 ## Initialize Firestone DB
-cred = credentials.Certificate('key.json')
 default_app = initialize_app(cred)
-db = firestore.client()
-users_ref = db.collection('users')
-tokens_ref = db.collection('tokens')
-trx_ref = db.collection('transactions')
-wsp_ref = db.collection('workspaces')
-sess_ref = db.collection('sessions')
-tentus_ref = db.collection('tenantUser')
-timlg_ref = db.collection('timeLog')
+"""
+## initialize firestore
+fsc = firestore.client()
+users_ref = fsc.collection('users')
+tokens_ref = fsc.collection('tokens')
+trx_ref = fsc.collection('transactions')
+wsp_ref = fsc.collection('workspaces')
+sess_ref = fsc.collection('sessions')
+tentus_ref = fsc.collection('tenantUser')
+timlg_ref = fsc.collection('timeLog')
+
+
 
 ## Session Service
 @app.route('/session', methods=['GET', 'POST', 'DELETE'])
@@ -88,7 +103,10 @@ def session():
                 ## Validating the values are there and are valid to proceed.
                 if _sess_params[0] and _sess_params[1] and _client['ip'] and _client['browser']:
                     ## Get user reference and seach for the user on the request.
-                    _user = users_ref.document(_sess_params[0]).get().to_dict()
+                    _usern = _sess_params[0]
+                    _usern = _usern.upper()
+                    if logging: print(_usern)
+                    _user = users_ref.document(_usern).get().to_dict()
                     ## if user not found, user will = None and will send 400 for security reasons, else it will continue
                     if _user != None:
                         ## The password gets encrypted and decoded. Then we delete the internal value of the password for security reasons
@@ -98,21 +116,21 @@ def session():
                         _fire = _user['pass'].decode('utf-8')
                         ## Generate the ID for this session.
                         _idg = Helpers.idGenerator(15)
-                        ## Validate if the pass is the same in the request as it is in the firebase_object
+                        ## Validate if the pas  s is the same in the request as it is in the firebase_object
                         if _requ == _fire:
                             ## Get the user token. In case exist it will retrieve the tokenId. Else return False.
-                            _token = authGet(_sess_params[0])
+                            _token = authGet(_usern)
                             ## Validate if valid token. is present. If not, generates a new token for the user.
                             if _token == False:  
                                 ## calls authPost sending user name and False. To generate a temporal token.
-                                _token = authPost(_sess_params[0], False)
+                                _token = authPost(_usern, False)
                             ## Generate the json object required to create the session object.
                             _session_json = {
                                 "clientIp" : _client['ip'],
                                 "clientVersion": _client['browser'],
                                 "id": _idg,
                                 "tokenId": _token['id'],
-                                "userId": _sess_params[0]
+                                "userId": _usern
                             }
                             try:
                                 ## Call to create the workspace.
@@ -122,7 +140,7 @@ def session():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Session object failed to be created."}), 500
                             ## In case session was created successflly returns trx code and session id
-                            return jsonify({"_session_id": _idg, "trxId": transactionPost(_sess_params[0], False, 1, "Session Post")}), 200
+                            return jsonify({"_session_id": _idg, "trxId": transactionPost(_usern, False, 1, "Session Post")}), 200
                         else:
                             ## in case passwords do not match
                             return jsonify({"status": "Error", "code": 400, "reason": "User/Pass incorrect."}), 400
@@ -161,14 +179,7 @@ def user():
     try:
         ## Method: POST /user
         if request.method == 'POST':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                ## for the use case where we should allow all request to create a new user.
-                _auth = True ##validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = True
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Validate required values, first creating a list of all required
                 req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
@@ -204,7 +215,7 @@ def user():
                     ## if user == None means user is not yet created, so flow continues, else return 409 indicating email already registered.
                     if user == None:
                         ## get pass from payload and decode 64 and then encrypt
-                        _user_post_params = ['activate','username','bday','email','fname','phone','pin','plan','postalCode','terms','type', 'tenant']
+                        _user_post_params = ['activate','username','bday','fname','phone','pin','plan','postalCode','terms','type', 'tenant']
                         _pcode = request.json['pass']
                         _pwrd = encrypt(Helpers.b64Decode(_pcode))
                         _pcode = ""
@@ -213,8 +224,9 @@ def user():
                         for _x in _user_post_params:
                             _objpay[_x] = request.json[_x]
                         _objpay['pass'] = _pwrd
+                        _objpay['email'] = s_email.upper()
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
-                        if users_ref.document(s_email).set(_objpay):
+                        if users_ref.document(s_email.upper()).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
                             return jsonify({"code": 202, "trxId": transactionPost(s_email, False, 1, "User Post")}), 202
                         else:
@@ -225,21 +237,13 @@ def user():
                         return jsonify({"status": "Error", "code": 409, "reason": "Email already registered" }), 409
                 else: 
                     ## There are missing required fields.
-                    print(_validation_errors)
                     return jsonify({"status": "Error", "code": 403, "reason": "Missing required fields or Validation Error", "validation_errors": _validation_errors}), 403
             else: 
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
-            ## Validate if the headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## If headers present, call to validateSession to know if it is a valid authorization,
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## validate minimum characters.
                 if 'email' in request.json:
@@ -293,15 +297,7 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /user
         elif request.method == 'GET': 
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
@@ -332,7 +328,7 @@ def user():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id.upper()))
                 elif _username:
                     ## The case username is present, will search with the specific username. 
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
@@ -374,15 +370,7 @@ def user():
         ## user Delete service
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -407,7 +395,7 @@ def user():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = users_ref.where(filter=FieldFilter("email", "==", _id))
+                    _search = users_ref.where(filter=FieldFilter("email", "==", _id.upper()))
                 elif _username:
                     ## The case username is present, will search with the specific username. 
                     _search = users_ref.where(filter=FieldFilter("username", "==", _username))
@@ -440,6 +428,7 @@ def user():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
@@ -449,15 +438,7 @@ def workspace():
     try:
         ## Method: POST /workspace
         if request.method == 'POST':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the workspace to exist.
                 if 'TaxId' in request.json:
@@ -489,7 +470,7 @@ def workspace():
                         # create workspace.
                         try:
                             ## Call to create the workspace.
-                            wsp_ref.document(request.json['TaxId']).set(_json_payload)
+                            wsp_ref.document(request.json['TaxId'].upper()).set(_json_payload)
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
@@ -507,15 +488,7 @@ def workspace():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: PUT /workspace
         elif request.method == 'PUT':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the workspace to exist.
                 if 'TaxId' in request.json and 'Owner' in request.json:
@@ -526,7 +499,7 @@ def workspace():
                     ## continue if a workspace with the taxId send already exist and the owner match.
                     if _wsp_exist != None and _fs_user['Owner'] == request.json['Owner']:
                         ## Creation of the optional fields that could be sent to update the workspace.
-                        _opt_fields = ['LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active']
+                        _opt_fields = ['LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active', 'Level']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -564,16 +537,8 @@ def workspace():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /workspace
-        elif request.method == 'GET': 
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+        elif request.method == 'GET':
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 _ws_fields = ['Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
@@ -608,7 +573,9 @@ def workspace():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                    if _owner:
+                        _search = _search.where(filter=FieldFilter("Owner", "==", _owner))
                 elif _shortCode: 
                     ## the case of shortCode is present wull search for it.
                     _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
@@ -647,21 +614,55 @@ def workspace():
                 _json_data_block["containsData"] = True if _count > 0 else False 
                 _json_data_block["query"] = _query
                 return jsonify(_json_data_block), 200
+            ## case where there is no authentication
             else:
+                ## seeks for the openData and the privateKey to allow to access the data.
+                if request.headers.get('openData') and request.headers.get('privateKey'):
+                    ## validates private key
+                    if request.headers.get('privateKey') == pk:
+                        ## search for the id
+                        _id = False if 'id' not in request.args else request.args.get('id')
+                        ## if id is present
+                        if _id:
+                            ## The case of id is present will search for that specific email
+                            _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                            ## list all the values to be returned in the get object.
+                            _ws_fields = ['TaxId', 'LegalName', 'InformalName', 'ShortCode', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor']
+                            ### Set the base for the json block to be returned. Define the data index for the list of users
+                            _json_data_block = {"items": []}
+                            _count = 0
+                            _limit = 1
+                            _query = ''
+                            for _ws in _search.stream():
+                                ## set the temporal json_blocl
+                                _json_block_l = {}
+                                ## apply the to_dict() to the current user to use their information.
+                                _acc = _ws.to_dict()
+                                ## Add a +1 to the count
+                                _count += 1
+                                ## Iterates into the _user_fields object to generate the json object for that user.
+                                for _x in _ws_fields:
+                                    ## Generates the json object.
+                                    _json_block_l[_x] = _acc[_x]
+                                ## Each iteration, append the user block to the main payload.
+                                _json_data_block["items"].append(_json_block_l)
+                                if _count+1 > _limit: break
+                            ## Before return a response, adding parameters for the get.
+                            _json_data_block["limit"] = _limit
+                            _json_data_block["count"] = _count
+                            ## In case count > 0 it returns True, else False.
+                            _json_data_block["containsData"] = True if _count > 0 else False 
+                            _json_data_block["query"] = _query
+                            return jsonify(_json_data_block), 200
+                        else:
+                            ## Missing authorization headers.
+                            return jsonify({"status": "Error", "code": 403, "reason": "Missing Parameter"}), 403
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -690,7 +691,7 @@ def workspace():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id))
+                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
                 elif _shortCode: 
                     ## the case of shortCode is present wull search for it.
                     _search = wsp_ref.where(filter=FieldFilter("ShortCode", "==", _shortCode))
@@ -732,6 +733,7 @@ def workspace():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
@@ -742,20 +744,12 @@ def tenantUser():
     try:
         ## Method: POST /tenantUser
         if request.method == 'POST':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json:
                     ## Search for a wsp with that TaxId
-                    _tnun_exist = tentus_ref.document(request.json['Id']).get()
+                    _tnun_exist = tentus_ref.document(request.json['Id'].upper()).get()
                     ## format the json object
                     _tnun_exist = _tnun_exist.to_dict()
                 ## If the wsp with that taxId do not exists proceeeds, otherwise return a 403 http code.
@@ -777,43 +771,47 @@ def tenantUser():
                         ## Create a for loop addressing all the required fields
                         for req_value in req_fields:
                             ## update _json_payload object adding current field.
-                            _json_payload.update({req_value: request.json[req_value]})
+                            if req_value != "Password": 
+                                if req_value == 'Id':
+                                    ## set upper case id 
+                                    _json_payload.update({req_value: request.json[req_value].upper()})
+                                else: 
+                                    ## add regular field
+                                    _json_payload.update({req_value: request.json[req_value]})
+                            ## if password
+                            elif req_value == "Password":
+                                ## set encoded password
+                                ##encrypt(Helpers.b64Decode(_pcode))
+                                if logging: print(request.json[req_value])
+                                _json_payload.update({req_value: encrypt(Helpers.b64Decode(request.json[req_value]))})
                         _json_payload.update({"Active": True})
                         # create tenantUser.
                         try:
                             ## Call to create the tenantUser.
-                            tentus_ref.document(request.json['Id']).set(_json_payload)
+                            tentus_ref.document(request.json['Id'].upper()).set(_json_payload)
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
-                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "tenantUser cannot be updated."}), int(str(e)[0:3])
+                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                         ## in case the ws is created, returns 200 abd the trxId 
-                        return jsonify({"status": "success", "code": 200, "reason": "tenantUser created succesfully.", "trxId": transactionPost(request.json['CreatedBy'],False, 1, "Tenant User POST")}), 200
+                        return jsonify({"status": "success", "code": 200, "reason": "User created succesfully.", "trxId": transactionPost(request.json['CreatedBy'],False, 1, "Tenant User POST")}), 200
                     else:
                         ## in case any required field is not present, will return a 400
                         return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
                 else: 
                     ## In case ws TaxId is already registered, will trwo a 403 error.
-                    return jsonify({"status": "Error", "code": 403, "reason": "tenantUser TaxId already registered."}), 403
+                    return jsonify({"status": "Error", "code": 403, "reason": "Username already registered."}), 403
             else:
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: PUT /tenantUser
         elif request.method == 'PUT':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json and 'Tenant' in request.json:
                     ## Search for a wsp with that TaxId
-                    _tnun_exist = tentus_ref.document(request.json['id'])
+                    _tnun_exist = tentus_ref.document(request.json['Id'])
                     ## format the json object to get values from it
                     _fs_user = _tnun_exist.get().to_dict()
                     ## continue if a tenantUser with the taxId send already exist and the owner match.
@@ -831,7 +829,13 @@ def tenantUser():
                             ## In case required field in json payload 
                             if req_value in request.json:
                                 ## update _json_payload object adding current field.
-                                _json_payload.update({req_value: request.json[req_value]})
+                                if req_value != "Password": 
+                                    ## add regular field
+                                    _json_payload.update({req_value: request.json[req_value]})
+                                ## if password
+                                elif req_value == "Password":
+                                    ## set encoded password
+                                    _json_payload.update({req_value: encrypt(Helpers.b64Decode(request.json[req_value]))})
                                 ## update flag to update user
                                 _go = True
                         if _go:
@@ -843,7 +847,7 @@ def tenantUser():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "User cannot be updated."}), int(str(e)[0:3])
                             ## in case the ws is created, returns 200 abd the trxId 
-                            return jsonify({"status": "success", "code": 202, "reason": "tenantUser updated succesfully.", "trxId": transactionPost(request.json['CreatedBy'], False, 1, "tenantUser Put")}), 202
+                            return jsonify({"status": "success", "code": 202, "reason": "tenantUser updated succesfully.", "trxId": transactionPost(request.json['currentUser'], False, 1, "tenantUser Put")}), 202
                         else:
                             ## in case any required field is not present, will return a 400
                             return jsonify({"status": "Error", "code": 400, "reason": "No fields to be updated, review the request."}), 400
@@ -858,20 +862,11 @@ def tenantUser():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /tenantUser
         elif request.method == 'GET': 
-            print("(!) >> GET /tenantUser")
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            if logging: print("(!) >> GET /tenantUser")
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
-                print(2)
                 ## list all the values to be returned in the get object.
-                req_fields = ['Username', 'Id', 'Password', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                req_fields = ['Username', 'Id', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -883,6 +878,7 @@ def tenantUser():
                 _count = 0
                 _tenant = False
                 _manager = False
+                _type = False
                 _active = "N"
 
                 ## Validate if _query present
@@ -896,6 +892,8 @@ def tenantUser():
                     _tenant = str(_parameters['tenant']) if 'tenant' in _parameters else _tenant
                     ## if shortCode param present, set the shortCode param
                     _manager = str(_parameters['manager']) if 'manager' in _parameters else _manager
+                    ## if type is present, set the type param
+                    _type = str(_parameters['type']) if 'type' in _parameters else _type
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -903,17 +901,26 @@ def tenantUser():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id))
+                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
+                    if _type: 
+                        _search = _search.where(filter=FieldFilter("Type", "==", _type))
+                    if _tenant: 
+                        _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
-                    _search = tentus_ref.where(filter=FieldFilter("manager", "==", _manager))
+                    _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
+                    if _tenant: 
+                        _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
                 elif _tenant:
                     ## The case username is present, will search with the specific username. 
-                    _search = tentus_ref.where(filter=FieldFilter("tenant", "==", _tenant))
+                    _search = tentus_ref.where(filter=FieldFilter("Tenant", "==", _tenant))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                    ### filter current search by type
+                    if _type: 
+                        _search = _search.where(filter=FieldFilter("Type", "==", 1 if _type != 0 else 0))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = tentus_ref.where(filter=FieldFilter("Active", "==", _active))
@@ -948,15 +955,7 @@ def tenantUser():
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -985,7 +984,7 @@ def tenantUser():
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id))
+                    _search = tentus_ref.where(filter=FieldFilter("Id", "==", _id.upper()))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
                     _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
@@ -1012,7 +1011,7 @@ def tenantUser():
                     ## validate if deletion was successful
                     if tenantUserDelete(_acc['Id']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['Id']] = transactionPost(_auth['CreatedBy'], False, 2, "TenantUser Delete")
+                        _trx[_acc['Id']] = transactionPost(_auth['userId'], False, 3, "TenantUser ("+_id+") Delete")
                     else:
                         ## Sums error count
                         _errors += 1
@@ -1027,6 +1026,7 @@ def tenantUser():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
@@ -1035,16 +1035,97 @@ def tenantUser():
 @app.route('/timeLog', methods=['GET','POST','PUT','DELETE'])
 def timeLog():
     try:
-        print("timelog")
         ## Method: POST /timeLog
         if request.method == 'POST':
-            print(1)
+            ## Look for the timeLog to exist.
+            if 'requestString' in request.json and 'ip' in request.json and 'browser' in request.json :
+                _decoded_str = Helpers.b64Decode(request.json['requestString'])
+                ## spliting the string into the un [0] and pass [1]
+                _sess_params = _decoded_str.split("_")
+                ### get tuser data.
+                _tuser = tentus_ref.document(_sess_params[0].upper()).get().to_dict()
+                if _tuser != None:
+                    ## The password gets encrypted and decoded. Then we delete the internal value of the password for security reasons
+                    _requ = encrypt(_sess_params[1]).decode('utf-8')
+                    ## Get the firebase_response_user object. It also is decoded.
+                    _fire = _tuser['Password'].decode('utf-8')
+                    if logging:
+                        print(_requ)
+                        print(_fire)
+                    if _requ == _fire:
+                        ### Logic to retrieve the last timeLog from the user that was pending.
+                        ### this goes and search for all the user timeLogs and then, filter if any has a 
+                        ### endTime == False which means is pending, 
+                        ### it will retrieve only pending timeLogs till all of them are completed.
+                        _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _sess_params[0].upper()))
+                        _search = _search.where(filter=FieldFilter("EndTime", "==", False))
+                        req_fields = ['Ip', 'Browser','Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
+                        ## set the temporal json_blocl
+                        _json_block_l = {}
+                        _go = False
+                        for _tl in _search.stream():
+                            ## apply the to_dict() to the current user to use their information.
+                            _acc = _tl.to_dict()
+                            ## Iterates into the _user_fields object to generate the json object for that user.
+                            for _x in req_fields:
+                                ## Generates the json object.
+                                _json_block_l[_x] = _acc[_x]
+                                _go = True
+                            break
+                        if _go: 
+                            return jsonify({"status": "success", "code": 202, "token": _json_block_l['Id'], "trxId": transactionPost("System", False, 1, "timeLog RECOVERED - "+_sess_params[0].upper())}), 202
+                        else: 
+                            ## Get the dates and times.
+                            _now = datetime.now()
+                            _dateGen = _now.strftime("%d%m%YH%M%S")
+                            _onlyTime = _now.strftime("%H:%M:%S")
+                            _onlyDate = _now.strftime("%d.%m.%Y")
+                            ## Geneerate the json
+                            _timelogId = Helpers.randomString(7) + _dateGen + Helpers.randomString(10)
+                            _json_template = {
+                                'Id': _timelogId,
+                                "UserId": _sess_params[0].upper(),
+                                "Active": True,
+                                "OriginalStartDate": _onlyDate,
+                                "OriginalStartTime": _onlyTime,
+                                "Ip": request.json['ip'],
+                                "Browser": request.json['browser'],
+                                "Edited": False,
+                                "EditedBy": False,
+                                "EditionDate": False,
+                                "EditionTime": False,
+                                "EndTimestamp": 0,
+                                "EndDate": False,
+                                "EndTime": False,
+                                "StartTimestamp":0,
+                                "StartDate": False,
+                                "StartTime": False,
+                                "OriginalEndDate": False,
+                                "OriginalEndTime": False
+                            }
+                            try:
+                                ## Call to create the timeLog.
+                                timlg_ref.document(_timelogId).set(_json_template)
+                            except Exception as e:
+                                ## In case of an error updating the user, retrieve a error message.
+                                print('(!) >> Handled external service exception: ' + str(e) )
+                                return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
+                            ## in case the ws is created, returns 200 abd the trxId 
+                            return jsonify({"status": "success", "code": 202, "token": _timelogId, "trxId": transactionPost("System", False, 1, "timeLog POST - "+_sess_params[0].upper())}), 202
+                    else:
+                        ## in case any required field is not present, will return a 400
+                        return jsonify({"status": "Error", "code": 401, "reason": "Incorrect Username or Password."}), 401
+                else:
+                    ## in case there is not registered user with the user id sent.
+                    return jsonify({"status": "Error", "code": 404, "reason": "User not found."}), 404
+            else: 
+                ## In case ws Id is already registered, will trwo a 403 error.
+                return jsonify({"status": "Error", "code": 400, "reason": "Missing required parameters."}), 400
+        ## Method: PUT /timeLog
+        elif request.method == 'PUT':
             ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
+            if 'Id' in request.json:
+                _auth = True
             else: 
                 ## Fixed to true to allow outside calls to log in to the system,
                 _auth = False
@@ -1052,70 +1133,11 @@ def timeLog():
                 ## Look for the timeLog to exist.
                 if 'Id' in request.json:
                     ## Search for a wsp with that Id
-                    _tlog_exist = timlg_ref.document(request.json['Id']).get()
-                    ## format the json object
-                    _tlog_exist = _tlog_exist.to_dict()
-                ## If the wsp with that Id do not exists proceeeds, otherwise return a 403 http code.
-                if _tlog_exist == None:
-                    ## Validate required values, first creating a list of all required
-                    req_fields = ['Active', 'Id', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
-                    all_fields = ['Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
-                    ## go and iterate to find all of them, if not _go will be false
-                    _go = True
-                    ## For Loop going for all the required fields.
-                    for req_value in req_fields:
-                        ## if it is not in the parameters, set flag to false.
-                        if req_value not in request.json:
-                            _go = False
-                    if _go:
-                        ## Create json template for the payload
-                        _json_template = '{ }'
-                        ## Load the json payload 
-                        _json_payload = json.loads(_json_template)
-                        ## Create a for loop addressing all the required fields
-                        for req_value in all_fields:
-                            ## update _json_payload object adding current field.
-                            if req_value in request.json: _json_payload.update({req_value: request.json[req_value]})
-                        # create timeLog.
-                        try:
-                            ## Call to create the timeLog.
-                            timlg_ref.document(request.json['Id']).set(_json_payload)
-                        except Exception as e:
-                            ## In case of an error updating the user, retrieve a error message.
-                            print('(!) >> Handled external service exception: ' + str(e) )
-                            return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "timeLog cannot be updated."}), int(str(e)[0:3])
-                        ## in case the ws is created, returns 200 abd the trxId 
-                        return jsonify({"status": "success", "code": 200, "reason": "timeLog created succesfully.", "trxId": transactionPost(request.json['UserId'],False, 1, "Time Log POST")}), 200
-                    else:
-                        ## in case any required field is not present, will return a 400
-                        return jsonify({"status": "Error", "code": 400, "reason": "Missing required fields"}), 400
-                else: 
-                    ## In case ws Id is already registered, will trwo a 403 error.
-                    return jsonify({"status": "Error", "code": 403, "reason": "timeLog Id already registered."}), 403
-            else:
-                ## Missing authorization headers.
-                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
-        ## Method: PUT /timeLog
-        elif request.method == 'PUT':
-            print(2)
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
-            if _auth:
-                ## Look for the timeLog to exist.
-                if 'Id' in request.json and 'UserId' in request.json:
-                    ## Search for a wsp with that Id
                     _tlog_exist = timlg_ref.document(request.json['Id'])
                     ## format the json object to get values from it
                     _fs_user = _tlog_exist.get().to_dict()
                     ## continue if a timeLog with the Id send already exist and the owner match.
-                    if _tlog_exist != None and _fs_user['UserId'] == request.json['UserId']:
+                    if _tlog_exist != None:
                         ## Creation of the optional fields that could be sent to update the timeLog.
                         req_fields = ['Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime',  'StartDate', 'StartTime']
                         ## define a flag to send or not the request.
@@ -1132,6 +1154,28 @@ def timeLog():
                                 _json_payload.update({req_value: request.json[req_value]})
                                 ## update flag to update user
                                 _go = True
+                        ### Setup the templates to get the start and enddates
+                        
+                        date_format = "%d.%m.%Y"
+                        time_format = "%H:%M:%S"
+                        ### in case the StartDate and Time is present, set the StartTimestamp
+                        if 'StartTime' in request.json and 'StartDate' in request.json:
+                            start_date_object = datetime.strptime(request.json['StartDate'], date_format)
+                            start_time_object = datetime.strptime(request.json['StartTime'], time_format)
+                            combined_start_datetime = datetime.combine(start_date_object.date(), start_time_object.time())
+                            seconds_start_dt = combined_start_datetime.timestamp()
+                            _json_payload.update({
+                                "StartTimestamp": seconds_start_dt
+                            })
+                        ### in case the EndDate and Time is present, set the EndTimestamp
+                        if 'EndDate' in request.json and 'EndTime' in request.json:
+                            end_date_object = datetime.strptime(request.json['EndDate'], date_format)
+                            end_time_object = datetime.strptime(request.json['EndTime'], time_format)
+                            combined_end_datetime = datetime.combine(end_date_object.date(), end_time_object.time())
+                            seconds_end_dt = combined_end_datetime.timestamp()
+                            _json_payload.update({
+                                "EndTimestamp":seconds_end_dt
+                            })
                         if _go:
                             try:
                                 ## Call to create the timeLog.
@@ -1141,7 +1185,7 @@ def timeLog():
                                 print('(!) >> Handled external service exception: ' + str(e) )
                                 return jsonify({"status":"Error", "code": str(e)[0:3], "reason": "Time Log be updated."}), int(str(e)[0:3])
                             ## in case the ws is created, returns 200 abd the trxId 
-                            return jsonify({"status": "success", "code": 202, "reason": "timeLog updated succesfully.", "trxId": transactionPost(request.json['UserId'], False, 1, "timeLog Put")}), 202
+                            return jsonify({"status": "success", "code": 202, "reason": "timeLog updated succesfully.", "trxId": transactionPost("System", False, 1, "timeLog Put")}), 202
                         else:
                             ## in case any required field is not present, will return a 400
                             return jsonify({"status": "Error", "code": 400, "reason": "No fields to be updated, review the request."}), 400
@@ -1156,20 +1200,10 @@ def timeLog():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /timeLog
         elif request.method == 'GET': 
-            print(3)
-            print("(!) >> GET /timeLog")
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
+            ## list all the values to be returned in the get object.
+            req_fields = ['Ip', 'Browser','Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']   
             if _auth:
-                ## list all the values to be returned in the get object.
-                req_fields = ['Active', 'Edited', 'EditedBy', 'EditionDate', 'EditionTime', 'EndDate', 'EndTime', 'Id', 'OriginalEndDate', 'OriginalEndTime', 'OriginalStartDate', 'OriginalStartTime', 'StartDate', 'StartTime', 'UserId']
                 ## Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -1181,6 +1215,8 @@ def timeLog():
                 _count = 0
                 _UserId = False
                 _active = "N"
+                _startDate = False
+                _endDate = False
 
                 ## Validate if _query present
                 if _query:
@@ -1191,6 +1227,10 @@ def timeLog():
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if UserId param present, set the owner param
                     _UserId = str(_parameters['UserId']) if 'UserId' in _parameters else _UserId
+                    ## if StartDate param present, set the enddate param
+                    _startDate = str(_parameters['StartDate']) if 'StartDate' in _parameters else _startDate
+                    ## if EndDate param present, set the enddate param
+                    _endDate = str(_parameters['EndDate']) if 'EndDate' in _parameters else _endDate
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -1206,6 +1246,24 @@ def timeLog():
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
                         _search = _search.where(filter=FieldFilter("Active", "==", _active))
+                    ## in case the request includes a enddate filter the starttimestamp to be minor than the enddate
+                    if _endDate: 
+                        date_format = "%d.%m.%Y"
+                        end_date_object = datetime.strptime(_endDate, date_format)
+                        _stmtp = end_date_object.timestamp()
+                        if logging:
+                            print("ed")
+                            print(_stmtp)
+                        _search = _search.where(filter=FieldFilter("StartTimestamp", "<", _stmtp))
+                    ## in a similar case, validates the start timestamp to be bigger than the start date in case this parameter is present.
+                    if _startDate: 
+                        date_format = "%d.%m.%Y"
+                        start_date_object = datetime.strptime(_startDate, date_format)
+                        _stmtp = start_date_object.timestamp()
+                        if logging: 
+                            print("sd")
+                            print(_stmtp)
+                        _search = _search.where(filter=FieldFilter("StartTimestamp", ">", _stmtp))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = timlg_ref.where(filter=FieldFilter("Active", "==", _active))
@@ -1213,11 +1271,11 @@ def timeLog():
                     ## In case any param was present, will search all
                     _search = timlg_ref
                 ## Loop in all the users inside the users_ref object
-                for _ws in _search.stream():
+                for _tl in _search.stream():
                     ## set the temporal json_blocl
                     _json_block_l = {}
                     ## apply the to_dict() to the current user to use their information.
-                    _acc = _ws.to_dict()
+                    _acc = _tl.to_dict()
                     ## Add a +1 to the count
                     _count += 1
                     ## Iterates into the _user_fields object to generate the json object for that user.
@@ -1235,21 +1293,37 @@ def timeLog():
                 _json_data_block["query"] = _query
                 return jsonify(_json_data_block), 200
             else:
-                ## Missing authorization headers.
-                return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+                if 'id' in request.args and request.headers.get('openData') and request.headers.get('privateKey'):
+                    if request.headers.get('privateKey') == pk:
+                        _search = timlg_ref.where(filter=FieldFilter("Id", "==", request.args.get('id')))
+                        _json_data_block = {"items": []}
+                        _count = 0
+                        for _tl in _search.stream():
+                            _json_block_l = {}
+                            _count += 1
+                            _acc = _tl.to_dict()
+                            for _x in req_fields:
+                                ## Generates the json object.
+                                _json_block_l[_x] = _acc[_x]
+                            _json_data_block["items"].append(_json_block_l)
+                            break
+                        ## Before return a response, adding parameters for the get.
+                        _json_data_block["limit"] = 1
+                        _json_data_block["count"] = _count
+                        ## In case count > 0 it returns True, else False.
+                        _json_data_block["containsData"] = True if _count > 0 else False 
+                        _json_data_block["query"] = False
+                        return jsonify(_json_data_block), 200
+                    else: 
+                        ## Missing authorization headers.
+                        return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
+                else:
+                    ## Missing authorization headers.
+                    return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
-            print(4)
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -1278,7 +1352,7 @@ def timeLog():
                     _search = timlg_ref.where(filter=FieldFilter("Id", "==", _id))
                 elif _UserId:
                     ## The case username is present, will search with the specific username. 
-                    _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId))
+                    _search = timlg_ref.where(filter=FieldFilter("UserId", "==", _UserId.upper()))
                     if _active != "N":
                         ## In case the _active param is present in valid fashion, will search for active or inactiv
                         ## e users.
@@ -1310,6 +1384,7 @@ def timeLog():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
         print (e)
         ## in case of error prints the exception and the code.
         return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
@@ -1320,15 +1395,7 @@ def transaction():
     try:
         ## Method: GET /transaction
         if request.method == 'GET':
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 _trx_fields = ['dateTime','id','userId','alert','action','severity'] 
@@ -1358,11 +1425,10 @@ def transaction():
                     _userId = str(_parameters['userId']) if 'userId' in _parameters else _userId
                     if 'alert' in _parameters:
                         _alert = True if str(_parameters['alert']).lower() == 'true' else False
-
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
                     ## The case of id is present will search for that specific email
-                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id))
+                    _search = trx_ref.where(filter=FieldFilter("id", "==", _id.upper()))
                 elif _action: 
                     ## the case of shortCode is present wull search for it.
                     _search = trx_ref.where(filter=FieldFilter("action", "==", _action))
@@ -1403,15 +1469,8 @@ def transaction():
         ## Method: DELETE /workspace
         elif request.method == 'DELETE':
             _errors = 0
-            ## Validate the required authentication headers are present
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                ## In case are present, call validate session. True if valid, else not valid. Fixed to true
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                ## If validateSession return false, delete the session id.
-                if _auth == False: deleteSession(request.headers.get('SessionId'))
-            else: 
-                ## Fixed to true to allow outside calls to log in to the system,
-                _auth = False
+            count = 0
+            _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## Logic to get params ######################################################
                 ## If query filter present in url params it will save it, else will set False.
@@ -1450,7 +1509,7 @@ def transaction():
                     _search = trx_ref.where(filter=FieldFilter("alert", "==", _alert))
                 elif _userId:
                     ## In case activate is present, will search for active or inactive users.
-                    _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
+                    _search = trx_ref.where(filter=FieldFilter("userId", "==", _userId.upper()))
                 else:
                     ## In case any param was present, will search all
                     _search = trx_ref
@@ -1463,14 +1522,15 @@ def transaction():
                     ## validate if deletion was successful
                     if transactionDelete(_acc['id']):
                         ## Add the trx number to the user email to the return response
-                        _trx[_acc['id']] = transactionPost(_auth['userId'], False, 3, "Transaction Delete")
+                        ## _trx[_acc['id']] = transactionPost(_auth['userId'], False, 3, "Transaction Delete")
+                        count += 1
                     else:
                         ## Sums error count
                         _errors += 1
                 ## validated the numer of errors
                 if _errors == 0:
                     ## if no errors returns only the trx 
-                    return jsonify(_trx), 200
+                    return jsonify({"count": count}), 200
                 else:
                     ## if errors, returns the error count and the trx successful
                     return jsonify({"status": "Error", "code": 500, "reason": "There was errors while deleting", "errorCount": _errors, "transactions": [_trx]}), 401
@@ -1478,13 +1538,16 @@ def transaction():
                 ## Missing authorization headers.
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
     except Exception as e:
+        print ( "(!) Unexpexted error. ")
+        print (e)
+        ## in case of error prints the exception and the code.
         return jsonify({"status": "Error", "code": str(e)[0:3], "reason": str(e)}), 500
 
 ## API Status
 @app.route('/')
 def status():
     local_ip = request.remote_addr
-    return "<html><head><title>Alexandria Status</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
+    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
 
 ## Encode token.
 @app.route('/encode', methods=['GET'])
@@ -1499,6 +1562,15 @@ def encode():
     except Exception as e:
         return {"status": "An error Occurred", "error": str(e)}
 
+## Countries API
+@app.route('/countries', methods=['GET'])
+def countries():
+    try:
+        data = countries_ref.get()
+        return jsonify(data), 200
+    except Exception as e:
+        return jsonify({"status": "An error Occurred", "error": str(e)}), 500
+
 ######################################################################
 ### Private Services  ################################################
 ######################################################################
@@ -1509,7 +1581,7 @@ def encode():
 ## _un: (optional) username of the user to delete
 def deleteUser(_id, _un):
     try:
-        print(" >> deleteUser() helper.")
+        if logging: print(" >> deleteUser("+_id+", "+_un+") helper.")
         deleteUserTokens(_id)
         deleteUserTrx(_id)
         if users_ref.document(_id).delete():
@@ -1518,6 +1590,7 @@ def deleteUser(_id, _un):
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteUser() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1526,13 +1599,14 @@ def deleteUser(_id, _un):
 ## _id: (required) id of the workspace to be deleted
 def deleteWorkspace(_id):
     try:
-        print(" >> deleteWorkspace() helper.")
+        if logging: print(" >> deleteWorkspace("+_id+") helper.")
         if wsp_ref.document(_id).delete():
             return True
         else: 
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteWorkspace() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1541,13 +1615,14 @@ def deleteWorkspace(_id):
 ## _id: (required) id of the tenantUser to be deleted
 def tenantUserDelete(_id):
     try:
-        print(" >> tenantUserDelete() helper.")
+        if logging: print(" >> tenantUserDelete("+_id+") helper.")
         if tentus_ref.document(_id).delete():
             return True
         else: 
             return False
     except Exception as e:
         print ( "(!) Exception in function: tenantUserDelete() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1556,17 +1631,40 @@ def tenantUserDelete(_id):
 ## _id: (required) id of the timeLog to be deleted
 def timeLogDelete(_id):
     try:
-        print(" >> timeLogDelete() helper.")
+        if logging: print(" >> timeLogDelete("+_id+") helper.")
         if timlg_ref.document(_id).delete():
             return True
         else: 
             return False
     except Exception as e:
         print ( "(!) Exception in function: timeLogDelete() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
-
+## common authentication
+## commonAuthProcess ()
+## requestObjt
+def commonAuthValidation(request, type = False):
+    try:
+        if logging: print(" >> commonAuthValidation( request object, complete = "+str(type)+") helper.")
+        if request and type == False:
+            if request.headers.get('SessionId') and request.headers.get('TokenId'):
+                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+                if _auth == False: 
+                    deleteSession(request.headers.get('SessionId'))
+                return _auth
+            else:
+                return False
+        elif request and type:
+            return False
+        else:
+            return False
+    except Exception as e:
+        print ( "(!) Unexpexted error. ")
+        print (e)
+        ## in case of error prints the exception and the code.
+        return jsonify({"status":"Error", "code": 500, "reason": str(e)}), 500
 
 ## Auth POST Service
 ## auth (POST)
@@ -1574,9 +1672,8 @@ def timeLogDelete(_id):
 ## _ilimited: If true will set a timedelta of 180 days, else will be only for 72 hours.
 def authPost(_user, _ilimited):
     try:
-        print(" >> authPost() service.")
-        ## import datetime library
-        from datetime import datetime, timedelta
+        if logging: print(" >> authPost("+_user+", "+str(_ilimited)+") service.")
+        ## import datetime library 
         ## get current time
         current_date_time = datetime.now()
         ## generates string for the token
@@ -1601,10 +1698,10 @@ def authPost(_user, _ilimited):
             return tobj
         else: 
             _status =  {"status": "Error", "errorStatus": "An error ocurred while creating the token, try again."}
-            print(_status)
             return False
     except Exception as e:
         print ( "(!) Exception in function: authPost() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1613,7 +1710,7 @@ def authPost(_user, _ilimited):
 ## _user: User Email for the Token authorization.
 def authGet(_user):
     try:
-        print(" >> authGet() service.")
+        if logging: print(" >> authGet("+_user+") service.")
         ## search in firestore from tokens of currrent user
         _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _user))
         ## Set the tokens count to know how many tokens were processed.
@@ -1639,6 +1736,7 @@ def authGet(_user):
             return False
     except Exception as e:
         print ( "(!) Exception in function: authGet() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1647,7 +1745,7 @@ def authGet(_user):
 ## _id: Token id to be deleted.
 def authDelete(_id):
     try:
-        print(" >> authDelete() service.")
+        if logging: print(" >> authDelete("+_id+") service.")
         ## Delete sessions related to token
         _sessions = sess_ref.where(filter=FieldFilter("tokenId", "==", _id))
         for _ses in _sessions.stream():
@@ -1658,6 +1756,7 @@ def authDelete(_id):
             return False
     except Exception as e:
         print ( "(!) Exception in function: authDelete() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1668,8 +1767,7 @@ def authDelete(_id):
 ## _token: token id that wants to valdiate
 def tokenValidator(_user, _token):
     try:
-        print(" >> tokenValidator() helper.")
-        from datetime import datetime
+        if logging: print(" >> tokenValidator("+_user+", "+_token+") helper.")
         current_date_time = datetime.now()
         current_date_time = current_date_time.strftime("%d%m%YH%M%S")
         new_current_date_time = datetime.strptime(current_date_time, '%d%m%YH%M%S')
@@ -1695,7 +1793,7 @@ def tokenValidator(_user, _token):
 ## auth (DELETE ALL USER TOKENS)
 ## _un: (required) Username that want to delete all tokens of.
 def deleteUserTokens(_un):
-    print(" >> deleteUserTokens() helper.")
+    if logging: print(" >> deleteUserTokens("+_un+") helper.")
     ## search in firestore from tokens of currrent user
     _tokens = tokens_ref.where(filter=FieldFilter("username", "==", _un))
     ## Set the tokens count to know how many tokens were deleted.
@@ -1713,13 +1811,14 @@ def deleteUserTokens(_un):
 ## _id: (required) id of the session object want to delete.
 def deleteSession(_id):
     try:
-        print(" >> deleteSession() helper.")
+        if logging: print(" >> deleteSession("+_id+") helper.")
         if sess_ref.document(_id).delete():
             return True
         else: 
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteSession() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1729,7 +1828,7 @@ def deleteSession(_id):
 ## _token: (required) token id vant to match.
 def validateSession(_id, _tokenid):
     try:
-        print(" >> validateSession() helper.")
+        if logging: print(" >> validateSession("+_id+", "+_tokenid+") helper.")
         _sess = sess_ref.document(_id).get()        
         if _sess != None:
             _dicted = _sess.to_dict()
@@ -1741,6 +1840,7 @@ def validateSession(_id, _tokenid):
             return False
     except Exception as e:
         print ( "(!) Exception in function: validateSession() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1753,13 +1853,14 @@ def validateSession(_id, _tokenid):
 ## _action: The name of the action that is generated the transaction for.
 def transactionPost(_userId, _alert, _severity, _action):
     try:
-        print(" >> transactionPost() helper.")
-        from datetime import datetime
+        if logging: print(" >> transactionPost("+_userId+", "+str(_alert)+", "+str(_severity)+", "+str(_action)+") helper.")
         _now = datetime.now()
         _dateGen = _now.strftime("%d%m%YH%M%S")
+        _onlyTime = _now.strftime("%H:%M:%S")
+        _onlyDate = _now.strftime("%d.%m.%Y")
         _trxId = Helpers.randomString(4) + _dateGen + Helpers.randomString(20)
         _trx_obj = {
-            "dateTime" : _dateGen,
+            "dateTime" : _onlyDate+" "+_onlyTime,
             "userId" : _userId,
             "id": _trxId,
             "alert": _alert if _alert else False,
@@ -1772,6 +1873,7 @@ def transactionPost(_userId, _alert, _severity, _action):
             return False
     except Exception as e:
         print ( "(!) Exception in function: transactionPost() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
     
@@ -1780,13 +1882,14 @@ def transactionPost(_userId, _alert, _severity, _action):
 ## _transaction_id: Number of the transaction.
 def transactionDelete(_transaction_id):
     try:
-        print(" >> deleteTransaction() helper.")
+        if logging: print(" >> deleteTransaction("+_transaction_id+") helper.")
         if trx_ref.document(_transaction_id).delete():
             return True
         else: 
             return False
     except Exception as e:
         print ( "(!) Exception in function: deleteTransaction() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1795,7 +1898,7 @@ def transactionDelete(_transaction_id):
 ## _transaction_id: Number of the transaction.
 def deleteUserTrx(_userId):
     try:
-        print(" >> deleteUserTrx() helper.")
+        if logging: print(" >> deleteUserTrx("+_userId+") helper.")
         ## search in firestore from tokens of currrent user
         _trx = trx_ref.where(filter=FieldFilter("userId", "==", _userId))
         ## Set the tokens count to know how many tokens were deleted.
@@ -1808,6 +1911,7 @@ def deleteUserTrx(_userId):
         return _trx_count   
     except Exception as e:
         print ( "(!) Exception in function: deleteUserTrx() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
@@ -1818,7 +1922,7 @@ def deleteUserTrx(_userId):
 ## Encrypt
 def encrypt(_string):
     try:    
-        print(" >> encrypt() helper.")
+        if logging: print(" >> encrypt("+_string+") helper.")
         bc_salt = app.config['CONF_SALT_KEY']
         salt = bc_salt.encode('utf-8')
         bytes_pwd = _string.encode('utf-8')
@@ -1826,6 +1930,7 @@ def encrypt(_string):
         return hashed_pwd
     except Exception as e:
         print ( "(!) Exception in function: encrypt() ")
+        print ( "(!) Unexpexted error. ")
         print (e)
         return False
 
