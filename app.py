@@ -52,8 +52,6 @@ sess_ref = fsc.collection('sessions')
 tentus_ref = fsc.collection('tenantUser')
 timlg_ref = fsc.collection('timeLog')
 
-
-
 ## Session Service
 @app.route('/session', methods=['GET', 'POST', 'DELETE'])
 def session():
