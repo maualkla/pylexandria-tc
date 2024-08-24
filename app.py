@@ -177,10 +177,10 @@ def user():
     try:
         ## Method: POST /user
         if request.method == 'POST':
-            _auth = commonAuthValidation(request, type = False)
+            _auth = commonAuthValidation(request, True)
             if _auth:
                 ## Validate required values, first creating a list of all required
-                req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
+                req_fields = ['str_sess_id', 'activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
                 ## go and iterate to find all of them, if not _go will be false
                 _validation_errors = {}
                 _go = True
@@ -223,6 +223,7 @@ def user():
                             _objpay[_x] = request.json[_x]
                         _objpay['pass'] = _pwrd
                         _objpay['email'] = s_email.upper()
+                        _objpay['str_sess_id'] = False
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email.upper()).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
@@ -241,18 +242,19 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
-            _auth = commonAuthValidation(request, type = False)
+            _auth = commonAuthValidation(request, request.args.get("type"))
             if _auth:
                 ## validate minimum characters.
                 if 'email' in request.json:
+                    print(request.json)
                     ## get reference for user to update
-                    _user_to_update = users_ref.document(request.json['email'])
+                    _user_to_update = users_ref.document(request.json['email'].upper())
                     ## Create json template for the payload
                     _json_template = '{ }'
                     ## Load the json payload 
                     _json_payload = json.loads(_json_template)
                     ## Set an array with all required fields.
-                    req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
+                    req_fields = ['str_sess_id', 'activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
                     ## define a flag to send or not the request.
                     _go = False
                     ## Create a for loop addressing all the required fields
@@ -295,7 +297,7 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /user
         elif request.method == 'GET': 
-            _auth = commonAuthValidation(request, type = False)
+            _auth = commonAuthValidation(request, False)
             if _auth:
                 ## list all the values to be returned in the get object.
                 _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
@@ -467,8 +469,16 @@ def workspace():
                         _json_payload.update({"Active": True})
                         # create workspace.
                         try:
-                            ## Call to create the workspace.
-                            wsp_ref.document(request.json['TaxId'].upper()).set(_json_payload)
+                            _user = users_ref.where(filter=FieldFilter("email", "==", request.json['Owner'].upper()))
+                            _user_data = {}
+                            for _us in _user.stream():
+                                ## apply the to_dict() to the current user to use their information.
+                                _user_data = _us.to_dict()
+                            if _user_data['activate']:
+                                ## Call to create the workspace.
+                                wsp_ref.document(request.json['TaxId'].upper()).set(_json_payload)
+                            else:
+                                return jsonify({"status": "Error", "code": "403", "reason": "User is not activated. Go to the payment flow before this action."}), 403
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
@@ -1652,10 +1662,12 @@ def commonAuthValidation(request, type = False):
                 if _auth == False: 
                     deleteSession(request.headers.get('SessionId'))
                 return _auth
-            else:
+            elif type == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
+                return True
+            elif type == True:
                 return False
         elif request and type:
-            return False
+            return True
         else:
             return False
     except Exception as e:
