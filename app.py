@@ -224,6 +224,7 @@ def user():
                         _objpay['pass'] = _pwrd
                         _objpay['email'] = s_email.upper()
                         _objpay['str_sess_id'] = False
+                        _objpay['activate'] = False
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email.upper()).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
