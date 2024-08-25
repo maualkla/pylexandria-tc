@@ -244,10 +244,10 @@ def user():
         ## Method: PUT /user
         elif request.method == 'PUT': 
             _auth = commonAuthValidation(request, request.args.get("type"))
+            print("put user auth: "+str(_auth))
             if _auth:
                 ## validate minimum characters.
                 if 'email' in request.json:
-                    print(request.json)
                     ## get reference for user to update
                     _user_to_update = users_ref.document(request.json['email'].upper())
                     ## Create json template for the payload
@@ -276,6 +276,7 @@ def user():
                         _json_payload.update({"pass": _encoded_pass})
                         ## updating flag
                         _go = True
+                    
                     ## If _go == True send request, else send error message
                     if _go:
                         try:
@@ -1654,22 +1655,23 @@ def timeLogDelete(_id):
 ## common authentication
 ## commonAuthProcess ()
 ## requestObjt
-def commonAuthValidation(request, type = False):
+def commonAuthValidation(request, type = "nil"):
     try:
         if logging: print(" >> commonAuthValidation( request object, complete = "+str(type)+") helper.")
-        if request and type == False:
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                if _auth == False: 
-                    deleteSession(request.headers.get('SessionId'))
-                return _auth
-            elif type == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
-                return True
-            elif type == True:
-                return False
-        elif request and type:
+        print(request.headers.get('SessionId'))
+        print(request.headers.get('TokenId'))
+        print(type)
+        if request.headers.get('SessionId') and request.headers.get('TokenId'):
+            _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+            if _auth == False: 
+                deleteSession(request.headers.get('SessionId'))
+            return _auth
+        elif type == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
             return True
+        elif type == True:
+            return False
         else:
+            print(" There is no tokens or type")
             return False
     except Exception as e:
         print ( "(!) Unexpexted error. ")
