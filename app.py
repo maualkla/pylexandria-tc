@@ -244,7 +244,7 @@ def user():
         ## Method: PUT /user
         elif request.method == 'PUT': 
             _auth = commonAuthValidation(request, request.args.get("type"))
-            print("put user auth: "+str(_auth))
+            if logging: print("put user auth: "+str(_auth))
             if _auth:
                 ## validate minimum characters.
                 if 'email' in request.json:
@@ -1658,9 +1658,6 @@ def timeLogDelete(_id):
 def commonAuthValidation(request, type = "nil"):
     try:
         if logging: print(" >> commonAuthValidation( request object, complete = "+str(type)+") helper.")
-        print(request.headers.get('SessionId'))
-        print(request.headers.get('TokenId'))
-        print(type)
         if request.headers.get('SessionId') and request.headers.get('TokenId'):
             _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
             if _auth == False: 
@@ -1671,7 +1668,6 @@ def commonAuthValidation(request, type = "nil"):
         elif type == True:
             return False
         else:
-            print(" There is no tokens or type")
             return False
     except Exception as e:
         print ( "(!) Unexpexted error. ")
