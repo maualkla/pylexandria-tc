@@ -1657,13 +1657,13 @@ def timeLogDelete(_id):
 ## requestObjt
 def commonAuthValidation(request, type = "nil"):
     try:
-        if logging: print(" >> commonAuthValidation( request object, complete = "+str(type)+") helper.")
+        if logging: print(" >> commonAuthValidation( request object, type = "+str(type)+") helper.")
         if request.headers.get('SessionId') and request.headers.get('TokenId'):
             _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
             if _auth == False: 
                 deleteSession(request.headers.get('SessionId'))
             return _auth
-        elif type == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
+        elif request.args.get('type') == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
             return True
         elif type == True:
             return False
