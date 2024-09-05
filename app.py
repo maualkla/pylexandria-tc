@@ -1,10 +1,10 @@
 ## Flask API for adminde-tc project.
 ## Pylexandria Project.
-## Coded by: Mauricio Alcala (@maualkla)
+## Coded by: Mauricio Alcala (@intmau)
 ## Creation Date: May 2023.
 ## Current Version: 0.04
-## Last Modification Date: Aug 2024.
-## More info at @intmau in twitter or in http://maualkla.com
+## Last Modification Date: Sep 2024.
+## More info at @intmau in twitter or in http://themudev.com
 ## Description: API for the services required by the adminde-tc proyect.
 
 ## Imports
