@@ -888,6 +888,7 @@ def tenantUser():
                 _count = 0
                 _tenant = False
                 _manager = False
+                _createdBy = False
                 _type = False
                 _active = "N"
 
@@ -904,6 +905,8 @@ def tenantUser():
                     _manager = str(_parameters['manager']) if 'manager' in _parameters else _manager
                     ## if type is present, set the type param
                     _type = str(_parameters['type']) if 'type' in _parameters else _type
+                    ## if createdBy is present, set the createdBy param
+                    _createdBy = str(_parameters['createdBy']) if 'createdBy' in _parameters else _createdBy
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -916,6 +919,8 @@ def tenantUser():
                         _search = _search.where(filter=FieldFilter("Type", "==", _type))
                     if _tenant: 
                         _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
+                    if _createdBy: 
+                        _search = _search.where(filter=FieldFilter("CreatedBy", "==", _createdBy))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
                     _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
@@ -931,6 +936,9 @@ def tenantUser():
                     ### filter current search by type
                     if _type: 
                         _search = _search.where(filter=FieldFilter("Type", "==", 1 if _type != 0 else 0))
+                elif _createdBy:
+                    ## The case username is present, will search with the specific username. 
+                    _search = tentus_ref.where(filter=FieldFilter("CreatedBy", "==", _createdBy))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = tentus_ref.where(filter=FieldFilter("Active", "==", _active))
