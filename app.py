@@ -180,7 +180,7 @@ def user():
             _auth = commonAuthValidation(request, True)
             if _auth:
                 ## Validate required values, first creating a list of all required
-                req_fields = ['str_sess_id', 'activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
+                req_fields = ['rp_email_token', 'rp_email_exp_date', 'str_sess_id', 'activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
                 ## go and iterate to find all of them, if not _go will be false
                 _validation_errors = {}
                 _go = True
@@ -225,6 +225,8 @@ def user():
                         _objpay['email'] = s_email.upper()
                         _objpay['str_sess_id'] = False
                         _objpay['activate'] = False
+                        _objpay['rp_email_token'] = False
+                        _objpay['rp_email_exp_date'] = False
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email.upper()).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
@@ -255,7 +257,7 @@ def user():
                     ## Load the json payload 
                     _json_payload = json.loads(_json_template)
                     ## Set an array with all required fields.
-                    req_fields = ['str_sess_id', 'activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
+                    req_fields = ['rp_email_token', 'rp_email_exp_date','str_sess_id', 'activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
                     ## define a flag to send or not the request.
                     _go = False
                     ## Create a for loop addressing all the required fields
@@ -302,7 +304,7 @@ def user():
             _auth = commonAuthValidation(request, False)
             if _auth:
                 ## list all the values to be returned in the get object.
-                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
+                _user_fields = ['rp_email_token', 'rp_email_exp_date','activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
