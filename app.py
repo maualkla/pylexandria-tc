@@ -316,6 +316,7 @@ def user():
                 _count = 0
                 _username = False
                 _active = "N"
+                _resetToken = False
                 ## Validate if _query present
                 if _query:
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
@@ -325,6 +326,8 @@ def user():
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if username param present, set the username param
                     _username = str(_parameters['username']) if 'username' in _parameters else _username
+                    ## if resetToken param is present
+                    _resetToken = str(_parameters['resetToken']) if 'resetToken' in _parameters else _resetToken
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -343,6 +346,9 @@ def user():
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
+                elif _resetToken:
+                    ## In case the request came looking for a reset_token
+                    _search = users_ref.where(filter=FieldFilter("rp_email_token", "==", _resetToken))
                 else:
                     ## In case any param was present, will search all
                     _search = users_ref
@@ -797,6 +803,8 @@ def tenantUser():
                                 if logging: print(request.json[req_value])
                                 _json_payload.update({req_value: encrypt(Helpers.b64Decode(request.json[req_value]))})
                         _json_payload.update({"Active": True})
+                        _json_payload.update({"rp_email_token": False})
+                        _json_payload.update({"rp_email_exp_date": False})
                         # create tenantUser.
                         try:
                             ## Call to create the tenantUser.
@@ -829,7 +837,7 @@ def tenantUser():
                     ## continue if a tenantUser with the taxId send already exist and the owner match.
                     if _tnun_exist != None and _fs_user['Tenant'] == request.json['Tenant']:
                         ## Creation of the optional fields that could be sent to update the tenantUser.
-                        req_fields = ['Username', 'Password', 'FullName', 'Email', 'Manager', 'Type']
+                        req_fields = ['rp_email_token', 'rp_email_exp_date', 'Username', 'Password', 'FullName', 'Email', 'Manager', 'Type']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -878,7 +886,7 @@ def tenantUser():
             _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
-                req_fields = ['Username', 'Id', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                req_fields = ['rp_email_token', 'rp_email_exp_date', 'Username', 'Id', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -1675,6 +1683,10 @@ def commonAuthValidation(request, type = "nil"):
             return _auth
         elif request.args.get('type') == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
             return True
+        elif request.args.get('type') == 'open' and 'rp_email_token' in request.json and 'rp_email_exp_date' in request.json and 'email' in request.json:
+            return True 
+        elif request.headers.get('openData') == 'true' and request.headers.get('privateKey') == app.config["PRIVATE_SERVICE_TOKEN"] :
+            return True 
         elif type == True:
             return False
         else:
