@@ -828,6 +828,7 @@ def tenantUser():
         elif request.method == 'PUT':
             _auth = commonAuthValidation(request, type = False)
             if _auth:
+                print(request.json)
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json and 'Tenant' in request.json:
                     ## Search for a wsp with that TaxId
@@ -901,6 +902,7 @@ def tenantUser():
                 _createdBy = False
                 _type = False
                 _active = "N"
+                _resetToken = False
 
                 ## Validate if _query present
                 if _query:
@@ -917,6 +919,8 @@ def tenantUser():
                     _type = str(_parameters['type']) if 'type' in _parameters else _type
                     ## if createdBy is present, set the createdBy param
                     _createdBy = str(_parameters['createdBy']) if 'createdBy' in _parameters else _createdBy
+                    ## if resetToken param is present
+                    _resetToken = str(_parameters['resetToken']) if 'resetToken' in _parameters else _resetToken
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -949,6 +953,9 @@ def tenantUser():
                 elif _createdBy:
                     ## The case username is present, will search with the specific username. 
                     _search = tentus_ref.where(filter=FieldFilter("CreatedBy", "==", _createdBy))
+                elif _resetToken:
+                    ## In case the request came looking for a reset_token
+                    _search = users_ref.where(filter=FieldFilter("rp_email_token", "==", _resetToken))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = tentus_ref.where(filter=FieldFilter("Active", "==", _active))
@@ -1683,7 +1690,7 @@ def commonAuthValidation(request, type = "nil"):
             return _auth
         elif request.args.get('type') == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
             return True
-        elif request.args.get('type') == 'open' and 'rp_email_token' in request.json and 'rp_email_exp_date' in request.json and 'email' in request.json:
+        elif request.args.get('type') == 'open' and 'rp_email_token' in request.json and 'rp_email_exp_date' in request.json and ('email' in request.json or 'Id' in request.json):
             return True 
         elif request.headers.get('openData') == 'true' and request.headers.get('privateKey') == app.config["PRIVATE_SERVICE_TOKEN"] :
             return True 
