@@ -828,7 +828,6 @@ def tenantUser():
         elif request.method == 'PUT':
             _auth = commonAuthValidation(request, type = False)
             if _auth:
-                print(request.json)
                 ## Look for the tenantUser to exist.
                 if 'Id' in request.json and 'Tenant' in request.json:
                     ## Search for a wsp with that TaxId
@@ -941,11 +940,8 @@ def tenantUser():
                     if _tenant: 
                         _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
                 elif _resetToken:
-                    print("(!) Reset Token search")
-                    print(_resetToken)
                     ## In case the request came looking for a reset_token
                     _search = tentus_ref.where(filter=FieldFilter("rp_email_token", "==", _resetToken))
-                    print(_search)
                 elif _tenant:
                     ## The case username is present, will search with the specific username. 
                     _search = tentus_ref.where(filter=FieldFilter("Tenant", "==", _tenant))
@@ -967,8 +963,6 @@ def tenantUser():
                     _search = tentus_ref
                 ## Loop in all the users inside the users_ref object
                 for _ws in _search.stream():
-                    print(" WS: ")
-                    print(_ws)
                     ## set the temporal json_blocl
                     _json_block_l = {}
                     ## apply the to_dict() to the current user to use their information.
@@ -979,7 +973,6 @@ def tenantUser():
                     for _x in req_fields:
                         ## Generates the json object.
                         _json_block_l[_x] = _acc[_x]
-                        print(str(_json_block_l[_x])+" :: "+str(_acc[_x]))
                     ## Each iteration, append the user block to the main payload.
                     _json_data_block["items"].append(_json_block_l)
                     if _count+1 > _limit: break
@@ -989,7 +982,6 @@ def tenantUser():
                 ## In case count > 0 it returns True, else False.
                 _json_data_block["containsData"] = True if _count > 0 else False 
                 _json_data_block["query"] = _query
-                print(_json_data_block)
                 return jsonify(_json_data_block), 200
             else:
                 ## Missing authorization headers.
