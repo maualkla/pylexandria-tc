@@ -477,6 +477,7 @@ def workspace():
                             ## update _json_payload object adding current field.
                             _json_payload.update({req_value: request.json[req_value]})
                         _json_payload.update({"Active": True})
+                        _json_payload.update({"CodeHash": Helpers.randomString(16).upper()})
                         # create workspace.
                         try:
                             _user = users_ref.where(filter=FieldFilter("email", "==", request.json['Owner'].upper()))
@@ -517,7 +518,7 @@ def workspace():
                     ## continue if a workspace with the taxId send already exist and the owner match.
                     if _wsp_exist != None and _fs_user['Owner'] == request.json['Owner']:
                         ## Creation of the optional fields that could be sent to update the workspace.
-                        _opt_fields = ['LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active', 'Level']
+                        _opt_fields = ['CodeHash', 'LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active', 'Level']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -559,7 +560,7 @@ def workspace():
             _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
-                _ws_fields = ['Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
+                _ws_fields = ['CodeHash', 'Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -1581,7 +1582,7 @@ def transaction():
 @app.route('/')
 def status():
     local_ip = request.remote_addr
-    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
+    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p><p>CODE: "+Helpers.randomString(16).upper()+"</p></body></html>"
 
 ## Encode token.
 @app.route('/encode', methods=['GET'])
