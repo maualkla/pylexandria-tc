@@ -17,6 +17,11 @@ from datetime import datetime,timedelta
 from config import Config
 from utilities.helpers import Helpers
 import rsa, bcrypt, json
+## tbd
+from google.cloud.firestore_v1.types import StructuredQuery
+##from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1.base_query import BaseCompositeFilter
+
 
 ## Initiate Public and private key
 publicKey, privateKey = rsa.newkeys(512)
@@ -591,8 +596,12 @@ def workspace():
                         _active = True if str(_parameters['active']).lower() == 'true' else False
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
-                    ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                    ##_search = wsp_ref.where(filter = BaseCompositeFilter("AND",[FieldFilter("TaxId","==",_id.upper()),FieldFilter('Owner',"==",_owner.upper())]))
+                    _search = (
+                        wsp_ref
+                        .where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                        ##.where(filter=FieldFilter("Owner", "==", _owner))
+                    )
                     if _owner:
                         _search = _search.where(filter=FieldFilter("Owner", "==", _owner))
                 elif _shortCode: 
