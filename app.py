@@ -1,10 +1,10 @@
 ## Flask API for adminde-tc project.
 ## Pylexandria Project.
-## Coded by: Mauricio Alcala (@maualkla)
+## Coded by: Mauricio Alcala (@intmau)
 ## Creation Date: May 2023.
-## Current Version: 0.04
-## Last Modification Date: Aug 2024.
-## More info at @intmau in twitter or in http://maualkla.com
+## Current Version: 0.05
+## Last Modification Date: Sep 2024.
+## More info at @intmau in twitter or in http://themudev.com
 ## Description: API for the services required by the adminde-tc proyect.
 
 ## Imports
@@ -17,6 +17,11 @@ from datetime import datetime,timedelta
 from config import Config
 from utilities.helpers import Helpers
 import rsa, bcrypt, json
+## tbd
+from google.cloud.firestore_v1.types import StructuredQuery
+##from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1.base_query import BaseCompositeFilter
+
 
 ## Initiate Public and private key
 publicKey, privateKey = rsa.newkeys(512)
@@ -51,8 +56,6 @@ wsp_ref = fsc.collection('workspaces')
 sess_ref = fsc.collection('sessions')
 tentus_ref = fsc.collection('tenantUser')
 timlg_ref = fsc.collection('timeLog')
-
-
 
 ## Session Service
 @app.route('/session', methods=['GET', 'POST', 'DELETE'])
@@ -179,10 +182,10 @@ def user():
     try:
         ## Method: POST /user
         if request.method == 'POST':
-            _auth = commonAuthValidation(request, type = False)
+            _auth = commonAuthValidation(request, True)
             if _auth:
                 ## Validate required values, first creating a list of all required
-                req_fields = ['activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
+                req_fields = ['rp_email_token', 'rp_email_exp_date', 'str_sess_id', 'activate', 'username', 'bday', 'pass', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'terms', 'type', 'tenant']
                 ## go and iterate to find all of them, if not _go will be false
                 _validation_errors = {}
                 _go = True
@@ -225,6 +228,10 @@ def user():
                             _objpay[_x] = request.json[_x]
                         _objpay['pass'] = _pwrd
                         _objpay['email'] = s_email.upper()
+                        _objpay['str_sess_id'] = False
+                        _objpay['activate'] = False
+                        _objpay['rp_email_token'] = False
+                        _objpay['rp_email_exp_date'] = False
                         ## send new user to be created, if created return 202 code and trxId code, else return 500 error while creating
                         if users_ref.document(s_email.upper()).set(_objpay):
                             ## If true means the user were created successfully. Return the trx code.
@@ -243,18 +250,19 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Missing authorization"}), 401
         ## Method: PUT /user
         elif request.method == 'PUT': 
-            _auth = commonAuthValidation(request, type = False)
+            _auth = commonAuthValidation(request, request.args.get("type"))
+            if logging: print("put user auth: "+str(_auth))
             if _auth:
                 ## validate minimum characters.
                 if 'email' in request.json:
                     ## get reference for user to update
-                    _user_to_update = users_ref.document(request.json['email'])
+                    _user_to_update = users_ref.document(request.json['email'].upper())
                     ## Create json template for the payload
                     _json_template = '{ }'
                     ## Load the json payload 
                     _json_payload = json.loads(_json_template)
                     ## Set an array with all required fields.
-                    req_fields = ['activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
+                    req_fields = ['rp_email_token', 'rp_email_exp_date','str_sess_id', 'activate', 'username', 'bday', 'fname', 'phone', 'pin', 'plan', 'postalCode', 'type', 'tenant']
                     ## define a flag to send or not the request.
                     _go = False
                     ## Create a for loop addressing all the required fields
@@ -275,6 +283,7 @@ def user():
                         _json_payload.update({"pass": _encoded_pass})
                         ## updating flag
                         _go = True
+                    
                     ## If _go == True send request, else send error message
                     if _go:
                         try:
@@ -297,10 +306,10 @@ def user():
                 return jsonify({"status": "Error", "code": 401, "reason": "Invalid Authorization"}), 401
         ## Method: GET /user
         elif request.method == 'GET': 
-            _auth = commonAuthValidation(request, type = False)
+            _auth = commonAuthValidation(request, False)
             if _auth:
                 ## list all the values to be returned in the get object.
-                _user_fields = ['activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
+                _user_fields = ['rp_email_token', 'rp_email_exp_date','activate','username','bday','email','fname','phone','plan','postalCode','terms','type','tenant','pin'] 
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -312,6 +321,7 @@ def user():
                 _count = 0
                 _username = False
                 _active = "N"
+                _resetToken = False
                 ## Validate if _query present
                 if _query:
                     ## calls to splitParams sending the _query form the request. If query correct returns a 
@@ -321,6 +331,8 @@ def user():
                     _limit = int(_parameters['limit']) if 'limit' in _parameters else _limit
                     ## if username param present, set the username param
                     _username = str(_parameters['username']) if 'username' in _parameters else _username
+                    ## if resetToken param is present
+                    _resetToken = str(_parameters['resetToken']) if 'resetToken' in _parameters else _resetToken
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -339,6 +351,9 @@ def user():
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = users_ref.where(filter=FieldFilter("activate", "==", _active))
+                elif _resetToken:
+                    ## In case the request came looking for a reset_token
+                    _search = users_ref.where(filter=FieldFilter("rp_email_token", "==", _resetToken))
                 else:
                     ## In case any param was present, will search all
                     _search = users_ref
@@ -467,10 +482,19 @@ def workspace():
                             ## update _json_payload object adding current field.
                             _json_payload.update({req_value: request.json[req_value]})
                         _json_payload.update({"Active": True})
+                        _json_payload.update({"CodeHash": Helpers.randomString(16).upper()})
                         # create workspace.
                         try:
-                            ## Call to create the workspace.
-                            wsp_ref.document(request.json['TaxId'].upper()).set(_json_payload)
+                            _user = users_ref.where(filter=FieldFilter("email", "==", request.json['Owner'].upper()))
+                            _user_data = {}
+                            for _us in _user.stream():
+                                ## apply the to_dict() to the current user to use their information.
+                                _user_data = _us.to_dict()
+                            if _user_data['activate']:
+                                ## Call to create the workspace.
+                                wsp_ref.document(request.json['TaxId'].upper()).set(_json_payload)
+                            else:
+                                return jsonify({"status": "Error", "code": "403", "reason": "User is not activated. Go to the payment flow before this action."}), 403
                         except Exception as e:
                             ## In case of an error updating the user, retrieve a error message.
                             print('(!) >> Handled external service exception: ' + str(e) )
@@ -499,7 +523,7 @@ def workspace():
                     ## continue if a workspace with the taxId send already exist and the owner match.
                     if _wsp_exist != None and _fs_user['Owner'] == request.json['Owner']:
                         ## Creation of the optional fields that could be sent to update the workspace.
-                        _opt_fields = ['LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active', 'Level']
+                        _opt_fields = ['CodeHash', 'LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active', 'Level']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -541,7 +565,7 @@ def workspace():
             _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
-                _ws_fields = ['Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
+                _ws_fields = ['CodeHash', 'Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -572,8 +596,12 @@ def workspace():
                         _active = True if str(_parameters['active']).lower() == 'true' else False
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
-                    ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                    ##_search = wsp_ref.where(filter = BaseCompositeFilter("AND",[FieldFilter("TaxId","==",_id.upper()),FieldFilter('Owner',"==",_owner.upper())]))
+                    _search = (
+                        wsp_ref
+                        .where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                        ##.where(filter=FieldFilter("Owner", "==", _owner))
+                    )
                     if _owner:
                         _search = _search.where(filter=FieldFilter("Owner", "==", _owner))
                 elif _shortCode: 
@@ -785,6 +813,8 @@ def tenantUser():
                                 if logging: print(request.json[req_value])
                                 _json_payload.update({req_value: encrypt(Helpers.b64Decode(request.json[req_value]))})
                         _json_payload.update({"Active": True})
+                        _json_payload.update({"rp_email_token": False})
+                        _json_payload.update({"rp_email_exp_date": False})
                         # create tenantUser.
                         try:
                             ## Call to create the tenantUser.
@@ -817,7 +847,7 @@ def tenantUser():
                     ## continue if a tenantUser with the taxId send already exist and the owner match.
                     if _tnun_exist != None and _fs_user['Tenant'] == request.json['Tenant']:
                         ## Creation of the optional fields that could be sent to update the tenantUser.
-                        req_fields = ['Username', 'Password', 'FullName', 'Email', 'Manager', 'Type']
+                        req_fields = ['rp_email_token', 'rp_email_exp_date', 'Username', 'Password', 'FullName', 'Email', 'Manager', 'Type']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -866,7 +896,7 @@ def tenantUser():
             _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
-                req_fields = ['Username', 'Id', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
+                req_fields = ['rp_email_token', 'rp_email_exp_date', 'Username', 'Id', 'FullName', 'Email', 'Manager', 'Tenant', 'Type', 'CreatedBy']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -878,8 +908,10 @@ def tenantUser():
                 _count = 0
                 _tenant = False
                 _manager = False
+                _createdBy = False
                 _type = False
                 _active = "N"
+                _resetToken = False
 
                 ## Validate if _query present
                 if _query:
@@ -894,6 +926,10 @@ def tenantUser():
                     _manager = str(_parameters['manager']) if 'manager' in _parameters else _manager
                     ## if type is present, set the type param
                     _type = str(_parameters['type']) if 'type' in _parameters else _type
+                    ## if createdBy is present, set the createdBy param
+                    _createdBy = str(_parameters['createdBy']) if 'createdBy' in _parameters else _createdBy
+                    ## if resetToken param is present
+                    _resetToken = str(_parameters['resetToken']) if 'resetToken' in _parameters else _resetToken
                     ## if active param present validates the str value, if true seet True, else set False. if not present, 
                     ## sets _active to "N" to ignore the value
                     if 'active' in _parameters:
@@ -906,11 +942,16 @@ def tenantUser():
                         _search = _search.where(filter=FieldFilter("Type", "==", _type))
                     if _tenant: 
                         _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
+                    if _createdBy: 
+                        _search = _search.where(filter=FieldFilter("CreatedBy", "==", _createdBy))
                 elif _manager: 
                     ## the case of shortCode is present wull search for it.
                     _search = tentus_ref.where(filter=FieldFilter("Manager", "==", _manager))
                     if _tenant: 
                         _search = _search.where(filter=FieldFilter("Tenant", "==", _tenant))
+                elif _resetToken:
+                    ## In case the request came looking for a reset_token
+                    _search = tentus_ref.where(filter=FieldFilter("rp_email_token", "==", _resetToken))
                 elif _tenant:
                     ## The case username is present, will search with the specific username. 
                     _search = tentus_ref.where(filter=FieldFilter("Tenant", "==", _tenant))
@@ -921,6 +962,9 @@ def tenantUser():
                     ### filter current search by type
                     if _type: 
                         _search = _search.where(filter=FieldFilter("Type", "==", 1 if _type != 0 else 0))
+                elif _createdBy:
+                    ## The case username is present, will search with the specific username. 
+                    _search = tentus_ref.where(filter=FieldFilter("CreatedBy", "==", _createdBy))
                 elif _active != "N":
                     ## In case activate is present, will search for active or inactive users.
                     _search = tentus_ref.where(filter=FieldFilter("Active", "==", _active))
@@ -1547,7 +1591,7 @@ def transaction():
 @app.route('/')
 def status():
     local_ip = request.remote_addr
-    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
+    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p><p>CODE: "+Helpers.randomString(16).upper()+"</p></body></html>"
 
 ## Encode token.
 @app.route('/encode', methods=['GET'])
@@ -1645,18 +1689,21 @@ def timeLogDelete(_id):
 ## common authentication
 ## commonAuthProcess ()
 ## requestObjt
-def commonAuthValidation(request, type = False):
+def commonAuthValidation(request, type = "nil"):
     try:
-        if logging: print(" >> commonAuthValidation( request object, complete = "+str(type)+") helper.")
-        if request and type == False:
-            if request.headers.get('SessionId') and request.headers.get('TokenId'):
-                _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
-                if _auth == False: 
-                    deleteSession(request.headers.get('SessionId'))
-                return _auth
-            else:
-                return False
-        elif request and type:
+        if logging: print(" >> commonAuthValidation( request object, type = "+str(type)+") helper.")
+        if request.headers.get('SessionId') and request.headers.get('TokenId'):
+            _auth = validateSession(request.headers.get('SessionId'), request.headers.get('TokenId'))
+            if _auth == False: 
+                deleteSession(request.headers.get('SessionId'))
+            return _auth
+        elif request.args.get('type') == 'open' and 'str_sess_id' in request.json and 'email' in request.json:
+            return True
+        elif request.args.get('type') == 'open' and 'rp_email_token' in request.json and 'rp_email_exp_date' in request.json and ('email' in request.json or 'Id' in request.json):
+            return True 
+        elif request.headers.get('openData') == 'true' and request.headers.get('privateKey') == app.config["PRIVATE_SERVICE_TOKEN"] :
+            return True 
+        elif type == True:
             return False
         else:
             return False
