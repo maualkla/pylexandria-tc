@@ -2,7 +2,7 @@
 ## Pylexandria Project.
 ## Coded by: Mauricio Alcala (@intmau)
 ## Creation Date: May 2023.
-## Current Version: 0.04
+## Current Version: 0.05
 ## Last Modification Date: Sep 2024.
 ## More info at @intmau in twitter or in http://themudev.com
 ## Description: API for the services required by the adminde-tc proyect.
@@ -17,6 +17,11 @@ from datetime import datetime,timedelta
 from config import Config
 from utilities.helpers import Helpers
 import rsa, bcrypt, json
+## tbd
+from google.cloud.firestore_v1.types import StructuredQuery
+##from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1.base_query import BaseCompositeFilter
+
 
 ## Initiate Public and private key
 publicKey, privateKey = rsa.newkeys(512)
@@ -477,6 +482,7 @@ def workspace():
                             ## update _json_payload object adding current field.
                             _json_payload.update({req_value: request.json[req_value]})
                         _json_payload.update({"Active": True})
+                        _json_payload.update({"CodeHash": Helpers.randomString(16).upper()})
                         # create workspace.
                         try:
                             _user = users_ref.where(filter=FieldFilter("email", "==", request.json['Owner'].upper()))
@@ -517,7 +523,7 @@ def workspace():
                     ## continue if a workspace with the taxId send already exist and the owner match.
                     if _wsp_exist != None and _fs_user['Owner'] == request.json['Owner']:
                         ## Creation of the optional fields that could be sent to update the workspace.
-                        _opt_fields = ['LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active', 'Level']
+                        _opt_fields = ['CodeHash', 'LegalName','InformalName','ShortCode','CountryCode','State','City','AddressLine1','AddressLine2','AddressLine3','AddressLine4','PhoneCountryCode','PhoneNumber','Email','MainHexColor','AlterHexColor','LowHexColor','Active', 'Level']
                         ## define a flag to send or not the request.
                         _go = False
                         ## Create json template for the payload
@@ -559,7 +565,7 @@ def workspace():
             _auth = commonAuthValidation(request, type = False)
             if _auth:
                 ## list all the values to be returned in the get object.
-                _ws_fields = ['Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
+                _ws_fields = ['CodeHash', 'Owner', 'TaxId', 'LegalName', 'InformalName', 'ShortCode', 'CountryCode', 'State', 'City', 'AddressLine1', 'AddressLine2', 'AddressLine3', 'AddressLine4', 'PhoneCountryCode', 'PhoneNumber', 'Email', 'MainHexColor', 'AlterHexColor', 'LowHexColor', 'Level', 'Active', 'CreationDate', 'PostalCode']
                 ### Set the base for the json block to be returned. Define the data index for the list of users
                 _json_data_block = {"items": []}
                 ## If query filter present in url params it will save it, else will set False.
@@ -590,8 +596,12 @@ def workspace():
                         _active = True if str(_parameters['active']).lower() == 'true' else False
                 ## Validate the 4 possible combinations for the query of the users search
                 if _id:
-                    ## The case of id is present will search for that specific email
-                    _search = wsp_ref.where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                    ##_search = wsp_ref.where(filter = BaseCompositeFilter("AND",[FieldFilter("TaxId","==",_id.upper()),FieldFilter('Owner',"==",_owner.upper())]))
+                    _search = (
+                        wsp_ref
+                        .where(filter=FieldFilter("TaxId", "==", _id.upper()))
+                        ##.where(filter=FieldFilter("Owner", "==", _owner))
+                    )
                     if _owner:
                         _search = _search.where(filter=FieldFilter("Owner", "==", _owner))
                 elif _shortCode: 
@@ -1581,7 +1591,7 @@ def transaction():
 @app.route('/')
 def status():
     local_ip = request.remote_addr
-    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p></body></html>"
+    return "<html><head><title>Alexandria Status at "+local_ip+"</title></head><body style='font-size: 200%;margin: 5%;'><script> setTimeout(function() {window.location.reload(); }, 30000); </script><h3>App Status: <markup style='color:green'>Up and Running</markup> </h3> <p> Server IP: "+local_ip+"</p><p>Last Update: "+Helpers.currentDateTime()+"</p><p>CODE: "+Helpers.randomString(16).upper()+"</p></body></html>"
 
 ## Encode token.
 @app.route('/encode', methods=['GET'])
